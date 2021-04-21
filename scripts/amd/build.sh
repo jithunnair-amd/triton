@@ -1,2 +1,2 @@
-cd triton/python
+cd python
 pip install -e .

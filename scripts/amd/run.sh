@@ -1,2 +1,2 @@
-sh scripts/build.sh
-sh scripts/test.sh
+sh scripts/amd/build.sh
+sh scripts/amd/test.sh
