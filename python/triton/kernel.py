@@ -85,10 +85,16 @@ class kernel:
         # device
         assert device.type in ['cuda', 'cpu']
         if device.type == 'cuda':
-            self.device_id = torch.cuda.current_device() if device.index is None else device.index
-            self.device = _triton.driver.cu_device(self.device_id, False)
-            cu_stream = torch.cuda.current_stream(self.device_id).cuda_stream
-            self.stream = _triton.driver.cu_stream(cu_stream, False)
+            if torch.version.hip is not None:
+                self.device_id = torch.cuda.current_device() if device.index is None else device.index
+                self.device = _triton.driver.cu_device(self.device_id, False)
+                cu_stream = torch.cuda.current_stream(self.device_id).cuda_stream
+                self.stream = _triton.driver.cu_stream(cu_stream, False)
+            else:
+                self.device_id = torch.cuda.current_device() if device.index is None else device.index
+                self.device = _triton.driver.cu_device(self.device_id, False)
+                cu_stream = torch.cuda.current_stream(self.device_id).cuda_stream
+                self.stream = _triton.driver.cu_stream(cu_stream, False)
         if device.type == 'cpu':
             self.device_id = -1
             self.device = _triton.driver.host_device()
