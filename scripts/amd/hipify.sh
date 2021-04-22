@@ -1,5 +1,2 @@
-git clone https://github.com/ROCmSoftwarePlatform/hipify-torch
-cd hipify-torch
-git checkout add_cli
-cd ..
-python3 hipify-torch/hipify_cli.py
+sh scripts/amd/submodule_add.sh
+python3 third_party/hipify-torch/hipify_cli.py

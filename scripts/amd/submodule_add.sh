@@ -1,0 +1,1 @@
+git submodule add -b add_cli https://github.com/ROCmSoftwarePlatform/hipify-torch third_party/hipify-torch
