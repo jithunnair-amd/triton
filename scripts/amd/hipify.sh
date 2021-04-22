@@ -1,4 +1,4 @@
-git clone https://github.com/micmelesse/hipify-torch
+git clone https://github.com/ROCmSoftwarePlatform/hipify-torch
 cd hipify-torch
 git checkout add_cli
 cd ..
