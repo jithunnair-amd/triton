@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.6)
 include(ExternalProject)
 
+# Trigger hipify if it is ROCm build
+# if (USE_ROCM)
+# include(third_party/hipify-torch/cmake/Hipify.cmake)
+# endif()
+
 if(NOT TRITON_LLVM_BUILD_DIR)
     set(TRITON_LLVM_BUILD_DIR ${CMAKE_BINARY_DIR})
 endif()
@@ -84,8 +89,30 @@ if(BUILD_PYTHON_MODULE)
 endif()
 
 
+file(GLOB_RECURSE LIBTRITON_HIP_SRC *_hip.*)
+list(FILTER LIBTRITON_HIP_SRC EXCLUDE REGEX ".*triton/python/build.*$") # don't include file from build
+message(${LIBTRITON_HIP_SRC} )
+
+# get CUDA analog of HIP srcs
+set(LIBTRITON_HIP_CUDA_SRC ${LIBTRITON_HIP_CUDA_SRC})
+foreach(HIP_SRC IN LISTS LIBTRITON_HIP_SRC)
+    string(REPLACE "_hip." "." CUDA_SRC ${HIP_SRC})
+    list(APPEND LIBTRITON_HIP_CUDA_SRC ${CUDA_SRC})
+endforeach()
+message(${LIBTRITON_HIP_CUDA_SRC} )
+
+
 # Triton
 file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
+foreach(SRC IN LISTS LIBTRITON_SRC)
+    if (${SRC} IN_LIST LIBTRITON_HIP_CUDA_SRC)
+        message(${SRC} )
+        list(REMOVE_ITEM LIBTRITON_SRC ${SRC})
+    endif()
+endforeach()
+
+message(${LIBTRITON_SRC} )
+# message( SEND_ERROR "ERROR!" )
 add_library(triton SHARED ${LIBTRITON_SRC} ${PYTHON_SRC})
 target_link_libraries(triton ${LLVM_LIBRARIES})
 
