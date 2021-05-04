@@ -1,0 +1,4 @@
+FROM rocm/pytorch
+COPY . /root/triton
+RUN cd /root/triton/python && \
+    pip install -e .
