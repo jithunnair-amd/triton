@@ -1,0 +1,4 @@
+FROM nvcr.io/nvidia/pytorch:21.04-py3
+COPY . /root/triton
+RUN cd /root/triton/python && \
+    pip install -e .
