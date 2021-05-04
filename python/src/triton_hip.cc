@@ -79,6 +79,7 @@ std::string extract_kernels(const std::string &str, const std::vector<std::strin
 }
 
 void init_triton_tools(py::module &&m) {
+  std::cout << "init_triton_tools" << std::endl;
   m.def("extract_kernels", &extract_kernels);
 }
 
@@ -87,6 +88,7 @@ void init_triton_tools(py::module &&m) {
 /*****************************************************************************/
 
 void init_triton_driver(py::module &&m) {
+  std::cout << "init_triton_driver" << std::endl;
   // base device
   py::class_<drv::device>(m, "device");
   // cuda device
@@ -118,6 +120,7 @@ void init_triton_driver(py::module &&m) {
 /* Python bindings for triton::runtime                                       */
 /*****************************************************************************/
 void init_triton_runtime(py::module &&m) {
+  std::cout << "init_triton_runtime" << std::endl;
   // argument type
   py::enum_<rt::arg_type>(m, "arg_type")
       .value("int1", rt::INT1_T)
@@ -156,6 +159,7 @@ void init_triton_runtime(py::module &&m) {
 }
 
 void init_triton(py::module &m) {
+  std::cout << "init_triton" << std::endl;
   py::module subm = m.def_submodule("triton");
   init_triton_driver(std::move(subm.def_submodule("driver")));
   init_triton_runtime(std::move(subm.def_submodule("runtime")));

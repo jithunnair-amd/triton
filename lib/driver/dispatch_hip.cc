@@ -93,6 +93,7 @@ namespace driver
 
 
 bool dispatch::cuinit(){
+  std::cout << "dispatch::cuinit" << std::endl;
   if(cuda_==nullptr){
     putenv((char*)"CUDA_CACHE_DISABLE=1");
     std::string libcuda = tools::getenv("TRITON_LIBCUDA");
@@ -112,6 +113,7 @@ bool dispatch::cuinit(){
 }
 
 bool dispatch::nvmlinit(){
+  std::cout << "dispatch::nvmlinit" << std::endl;
   if(nvml_==nullptr)
     nvml_ = dlopen("libnvidia-ml.so", RTLD_LAZY);
   nvmlReturn_t (*fptr)();
@@ -123,6 +125,7 @@ bool dispatch::nvmlinit(){
 }
 
 bool dispatch::spvllvminit(){
+  std::cout << "dispatch::spvllvminit" << std::endl;
   if(spvllvm_==nullptr)
     spvllvm_ = dlopen("libLLVMSPIRVLib.so", RTLD_LAZY);
   return spvllvm_ != nullptr;
