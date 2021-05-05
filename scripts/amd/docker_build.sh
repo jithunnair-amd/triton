@@ -3,6 +3,7 @@
 
 # set path
 DOCKERFILE_PATH=docker/Dockerfile.triton_rocm
+# DOCKERFILE_PATH=docker/Dockerfile.triton_cuda
 
 # get tag
 DOCKERFILE_NAME=$(basename $DOCKERFILE_PATH)
