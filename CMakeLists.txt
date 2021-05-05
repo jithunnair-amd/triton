@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.6)
 include(ExternalProject)
 
+set(USE_ROCM FALSE)
+
 # Trigger hipify if it is ROCm build
 # if (USE_ROCM)
 # include(third_party/hipify-torch/cmake/Hipify.cmake)
@@ -81,43 +83,56 @@ if(BUILD_PYTHON_MODULE)
     set(CUTLASS_INCLUDE_DIR "$ENV{CUTLASS_INCLUDE_DIR}")
     set(CUTLASS_LIBRARY_DIR "$ENV{CUTLASS_LIBRARY_DIR}")
     if(NOT("${CUTLASS_INCLUDE_DIR}" STREQUAL "") AND NOT("${CUTLASS_LIBRARY_DIR}" STREQUAL ""))
-        # set(CUTLASS_SRC ${PYTHON_SRC_PATH}/cutlass.cc)
+    if (USE_ROCM)
         set(CUTLASS_SRC ${PYTHON_SRC_PATH}/cutlass_hip.cc)
+    else()
+        set(CUTLASS_SRC ${PYTHON_SRC_PATH}/cutlass.cc)
+    endif()
+  
         add_definitions(-DWITH_CUTLASS_BINDINGS)
         set(CUTLASS_LIBRARIES "cutlass.a")
     endif()
     message(STATUS ${CUTLASS_INCLUDE_PATH})
     include_directories("." ${PYTHON_SRC_PATH} ${PYTHON_INCLUDE_DIRS} ${CUTLASS_INCLUDE_DIR})
     link_directories(${PYTHON_LINK_DIRS} ${CUTLASS_LIBRARY_DIR})
-    # set(PYTHON_SRC ${PYTHON_SRC_PATH}/main.cc ${PYTHON_SRC_PATH}/triton.cc  ${PYTHON_SRC_PATH}/superblock.cc ${CUTLASS_SRC})
-    set(PYTHON_SRC ${PYTHON_SRC_PATH}/main.cc ${PYTHON_SRC_PATH}/triton_hip.cc  ${PYTHON_SRC_PATH}/superblock_hip.cc ${CUTLASS_SRC})
+    
+    if (USE_ROCM)
+        set(PYTHON_SRC ${PYTHON_SRC_PATH}/main.cc ${PYTHON_SRC_PATH}/triton_hip.cc  ${PYTHON_SRC_PATH}/superblock_hip.cc ${CUTLASS_SRC})
+    else()
+        set(PYTHON_SRC ${PYTHON_SRC_PATH}/main.cc ${PYTHON_SRC_PATH}/triton.cc  ${PYTHON_SRC_PATH}/superblock.cc ${CUTLASS_SRC})
+    endif()
 endif()
 
-
-file(GLOB_RECURSE LIBTRITON_HIP_SRC *_hip.*)
-list(FILTER LIBTRITON_HIP_SRC EXCLUDE REGEX ".*triton/python/build.*$") # don't include file from build
-# message(${LIBTRITON_HIP_SRC} )
-
-# get CUDA analog of HIP srcs
-set(LIBTRITON_HIP_CUDA_SRC ${LIBTRITON_HIP_CUDA_SRC})
-foreach(HIP_SRC IN LISTS LIBTRITON_HIP_SRC)
-    string(REPLACE "_hip." "." CUDA_SRC ${HIP_SRC})
-    list(APPEND LIBTRITON_HIP_CUDA_SRC ${CUDA_SRC})
-endforeach()
-# message(${LIBTRITON_HIP_CUDA_SRC} )
-
-
 # Triton
-file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
-foreach(SRC IN LISTS LIBTRITON_SRC)
-    if (${SRC} IN_LIST LIBTRITON_HIP_CUDA_SRC)
-        # message(${SRC} )
+if (USE_ROCM)
+    # collect hip src files
+    file(GLOB_RECURSE LIBTRITON_HIP_SRC *_hip.*)
+    list(FILTER LIBTRITON_HIP_SRC EXCLUDE REGEX ".*triton/python/build.*$") # don't include file from build
+
+    # get CUDA analog of HIP srcs
+    set(LIBTRITON_CUDA_ANALOG_SRC ${LIBTRITON_CUDA_ANALOG_SRC})
+    foreach(HIP_SRC IN LISTS LIBTRITON_HIP_SRC)
+        string(REPLACE "_hip." "." CUDA_SRC ${HIP_SRC})
+        list(APPEND LIBTRITON_CUDA_ANALOG_SRC ${CUDA_SRC})
+    endforeach()
+
+    # remove CUDA analogs of HIP srcs
+    file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
+    foreach(SRC IN LISTS LIBTRITON_SRC)
+        if (${SRC} IN_LIST LIBTRITON_CUDA_ANALOG_SRC)
+            list(REMOVE_ITEM LIBTRITON_SRC ${SRC})
+        endif()
+    endforeach()
+else ()
+    file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
+    foreach(SRC IN LISTS LIBTRITON_SRC)
+    if (${SRC} IN_LIST LIBTRITON_HIP_SRC)
         list(REMOVE_ITEM LIBTRITON_SRC ${SRC})
     endif()
 endforeach()
+endif()
 
-# message(${LIBTRITON_SRC} )
-# message( SEND_ERROR "ERROR!" )
+
 add_library(triton SHARED ${LIBTRITON_SRC} ${PYTHON_SRC})
 target_link_libraries(triton ${LLVM_LIBRARIES})
 
