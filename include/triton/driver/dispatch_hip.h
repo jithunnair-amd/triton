@@ -121,6 +121,7 @@ private:
 
   // Libraries
   static void* cuda_;
+  static void* hip_;
   static void* nvml_;
   static void* vulkan_;
   static void* spvllvm_;

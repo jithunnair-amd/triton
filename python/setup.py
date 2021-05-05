@@ -26,13 +26,16 @@ class CMakeBuild(build_ext):
     user_options = build_ext.user_options + [('base-dir=', None, 'base directory of Triton')]
 
     def initialize_options(self):
+        print("CMakeBuild:initialize_options")
         build_ext.initialize_options(self)
         self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 
     def finalize_options(self):
+        print("CMakeBuild:finalize_options")
         build_ext.finalize_options(self)
 
     def run(self):
+        print("CMakeBuild:run")
         try:
             out = subprocess.check_output(["cmake", "--version"])
         except OSError:
@@ -59,8 +62,10 @@ class CMakeBuild(build_ext):
         if not os.path.exists(llvm_build_dir):
             os.makedirs(llvm_build_dir)
         # python directories
-        python_include_dirs = [distutils.sysconfig.get_python_inc()] + ['/usr/local/cuda/include']
+        python_include_dirs = [distutils.sysconfig.get_python_inc()] + ['/usr/local/cuda/include','/opt/rocm/include']
+        print("python_include_dirs",python_include_dirs)
         python_lib_dirs = distutils.sysconfig.get_config_var("LIBDIR")
+        print("python_lib_dirs",python_lib_dirs)
         cmake_args = [
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
             "-DBUILD_TUTORIALS=OFF",
@@ -84,6 +89,11 @@ class CMakeBuild(build_ext):
             build_args += ["--", "-j8"]
 
         env = os.environ.copy()
+        print("env", env)
+        print("self.base_dir", self.base_dir)
+        print("=self.build_temp", self.build_temp)
+        print("cmake_args", cmake_args)
+        print("build_args", build_args)
         subprocess.check_call(["cmake", self.base_dir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 

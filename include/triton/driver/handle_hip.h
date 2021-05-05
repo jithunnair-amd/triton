@@ -87,7 +87,7 @@ struct cu_event_t{
 };
 
 struct CUPlatform{
-  CUPlatform() : status_(dispatch::hipInit(0)) { }
+  CUPlatform() : status_(dispatch::hipInit(0)) { std::cout << "CUPlatform" << std::endl; }
   operator bool() const { return status_; }
 private:
   hipError_t status_;

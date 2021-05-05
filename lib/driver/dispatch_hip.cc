@@ -74,17 +74,17 @@ namespace driver
 {return f_impl<dispatch::init>(hlib, fname, fname ## _, #fname, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s); }
 
 //Specialized helpers for CUDA
-#define CUDA_DEFINE1(ret, fname, t1) DEFINE1(cuinit, cuda_, ret, fname, t1)
-#define CUDA_DEFINE2(ret, fname, t1, t2) DEFINE2(cuinit, cuda_, ret, fname, t1, t2)
-#define CUDA_DEFINE3(ret, fname, t1, t2, t3) DEFINE3(cuinit, cuda_, ret, fname, t1, t2, t3)
-#define CUDA_DEFINE4(ret, fname, t1, t2, t3, t4) DEFINE4(cuinit, cuda_, ret, fname, t1, t2, t3, t4)
-#define CUDA_DEFINE5(ret, fname, t1, t2, t3, t4, t5) DEFINE5(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5)
-#define CUDA_DEFINE6(ret, fname, t1, t2, t3, t4, t5, t6) DEFINE6(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5, t6)
-#define CUDA_DEFINE7(ret, fname, t1, t2, t3, t4, t5, t6, t7) DEFINE7(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5, t6, t7)
-#define CUDA_DEFINE8(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8) DEFINE8(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8)
-#define CUDA_DEFINE9(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9) DEFINE9(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9)
-#define CUDA_DEFINE10(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10) DEFINE10(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
-#define CUDA_DEFINE11(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11) DEFINE11(cuinit, cuda_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
+#define CUDA_DEFINE1(ret, fname, t1) DEFINE1(cuinit, hip_, ret, fname, t1)
+#define CUDA_DEFINE2(ret, fname, t1, t2) DEFINE2(cuinit, hip_, ret, fname, t1, t2)
+#define CUDA_DEFINE3(ret, fname, t1, t2, t3) DEFINE3(cuinit, hip_, ret, fname, t1, t2, t3)
+#define CUDA_DEFINE4(ret, fname, t1, t2, t3, t4) DEFINE4(cuinit, hip_, ret, fname, t1, t2, t3, t4)
+#define CUDA_DEFINE5(ret, fname, t1, t2, t3, t4, t5) DEFINE5(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5)
+#define CUDA_DEFINE6(ret, fname, t1, t2, t3, t4, t5, t6) DEFINE6(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5, t6)
+#define CUDA_DEFINE7(ret, fname, t1, t2, t3, t4, t5, t6, t7) DEFINE7(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5, t6, t7)
+#define CUDA_DEFINE8(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8) DEFINE8(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8)
+#define CUDA_DEFINE9(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9) DEFINE9(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9)
+#define CUDA_DEFINE10(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10) DEFINE10(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
+#define CUDA_DEFINE11(ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11) DEFINE11(cuinit, hip_, ret, fname, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
 
 #define NVML_DEFINE0(ret, fname) DEFINE0(nvmlinit, nvml_, ret, fname)
 #define NVML_DEFINE1(ret, fname, t1) DEFINE1(nvmlinit, nvml_, ret, fname, t1)
@@ -94,18 +94,20 @@ namespace driver
 
 bool dispatch::cuinit(){
   std::cout << "dispatch::cuinit" << std::endl;
-  if(cuda_==nullptr){
-    putenv((char*)"CUDA_CACHE_DISABLE=1");
-    std::string libcuda = tools::getenv("TRITON_LIBCUDA");
-    if(libcuda.empty())
-      cuda_ = dlopen("libcuda.so", RTLD_LAZY);
+  if(hip_==nullptr){
+    putenv((char*)"HIP_CACHE_DISABLE=1");
+    // std::string libhip = tools::getenv("TRITON_LIBCUDA");
+    std::string libhip = "/opt/rocm/include/hip/hip_runtime.h";
+    std::cout << "libhip: " << libhip << std::endl;
+    if(libhip.empty())
+      hip_ = dlopen("libhip.so", RTLD_LAZY);
     else
-      cuda_ = dlopen(libcuda.c_str(), RTLD_LAZY);
+      hip_ = dlopen(libhip.c_str(), RTLD_LAZY);
   }
-  if(cuda_ == nullptr)
+  if(hip_ == nullptr)
     return false;
   hipError_t (*fptr)(unsigned int);
-  hipInit_ = dlsym(cuda_, "hipInit");
+  hipInit_ = dlsym(hip_, "hipInit");
   *reinterpret_cast<void **>(&fptr) = hipInit_;
   hipError_t res = (*fptr)(0);
   check(res);
@@ -196,6 +198,7 @@ void dispatch::release(){
 }
 
 void* dispatch::cuda_;
+void* dispatch::hip_;
 void* dispatch::nvml_;
 void* dispatch::spvllvm_;
 

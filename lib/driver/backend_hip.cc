@@ -41,6 +41,7 @@ namespace driver
 /*-----------------------------------*/
 
 void backend::platforms::init() {
+  std::cout << "backend::platforms::init()" << std::endl;
   if(!cache_.empty())
     return;
   //if CUDA is here

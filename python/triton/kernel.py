@@ -87,7 +87,7 @@ class kernel:
         if device.type == 'cuda':
             if torch.version.hip is not None:
                 self.device_id = torch.cuda.current_device() if device.index is None else device.index
-                self.device = _triton.driver.cu_device(self.device_id, False)
+                self.device = _triton.driver.hip_device(self.device_id, False)
                 cu_stream = torch.cuda.current_stream(self.device_id).cuda_stream
                 self.stream = _triton.driver.cu_stream(cu_stream, False)
             else:
