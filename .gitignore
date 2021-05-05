@@ -1,0 +1,6 @@
+__pycache__
+.vscode
+# *_hip*
+python/build
+*.so
+*.egg-info/
