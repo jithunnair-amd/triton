@@ -1,0 +1,8 @@
+FROM nvcr.io/nvidia/pytorch:21.04-py3
+# FROM nvcr.io/nvidia/pytorch:20.11-py3
+# FROM rocm/pytorch
+# RUN apt install libxml2
+RUN conda update icu
+COPY . /root/triton
+RUN cd /root/triton/python && \
+    pip install --verbose -e .
