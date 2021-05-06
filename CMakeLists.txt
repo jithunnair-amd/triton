@@ -104,6 +104,8 @@ if(BUILD_PYTHON_MODULE)
 endif()
 
 # Triton
+file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
+
 if (USE_ROCM)
     # collect hip src files
     file(GLOB_RECURSE LIBTRITON_HIP_SRC *_hip.*)
@@ -117,19 +119,19 @@ if (USE_ROCM)
     endforeach()
 
     # remove CUDA analogs of HIP srcs
-    file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
     foreach(SRC IN LISTS LIBTRITON_SRC)
         if (${SRC} IN_LIST LIBTRITON_CUDA_ANALOG_SRC)
             list(REMOVE_ITEM LIBTRITON_SRC ${SRC})
         endif()
     endforeach()
 else ()
-    file(GLOB_RECURSE LIBTRITON_SRC lib/*.cc)
+    # fitler hip files
+    file(GLOB_RECURSE LIBTRITON_HIP_SRC *_hip.*)
     foreach(SRC IN LISTS LIBTRITON_SRC)
-    if (${SRC} IN_LIST LIBTRITON_HIP_SRC)
-        list(REMOVE_ITEM LIBTRITON_SRC ${SRC})
-    endif()
-endforeach()
+        if (${SRC} IN_LIST LIBTRITON_HIP_SRC)
+            list(REMOVE_ITEM LIBTRITON_SRC ${SRC})
+        endif()
+    endforeach()
 endif()
 
 
