@@ -6,6 +6,7 @@ import platform
 import subprocess
 import distutils
 import glob
+import torch
 import tempfile
 from distutils.version import LooseVersion
 from setuptools import setup, Extension, find_packages
