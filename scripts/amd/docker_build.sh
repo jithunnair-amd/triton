@@ -2,8 +2,8 @@
 # set -o xtrace
 
 # set path
-DOCKERFILE_PATH=docker/Dockerfile.triton_rocm
-# DOCKERFILE_PATH=docker/Dockerfile.triton_cuda
+DOCKERFILE_PATH=scripts/docker/Dockerfile.triton_rocm
+# DOCKERFILE_PATH=scripts/docker/Dockerfile.triton_cuda
 
 # get tag
 DOCKERFILE_NAME=$(basename $DOCKERFILE_PATH)
