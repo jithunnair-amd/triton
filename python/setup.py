@@ -62,7 +62,8 @@ class CMakeBuild(build_ext):
         if not os.path.exists(llvm_build_dir):
             os.makedirs(llvm_build_dir)
         # python directories
-        python_include_dirs = [distutils.sysconfig.get_python_inc()] + ['/usr/local/cuda/include','/opt/rocm/include']
+        # python_include_dirs = [distutils.sysconfig.get_python_inc()] + ['/usr/local/cuda/include']
+        python_include_dirs = [distutils.sysconfig.get_python_inc()] + ['/opt/rocm/include']
         print("python_include_dirs",python_include_dirs)
         python_lib_dirs = distutils.sysconfig.get_config_var("LIBDIR")
         print("python_lib_dirs",python_lib_dirs)
