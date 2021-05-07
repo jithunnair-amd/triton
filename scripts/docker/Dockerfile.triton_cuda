@@ -1,8 +1,24 @@
-FROM nvcr.io/nvidia/pytorch:21.04-py3
-# FROM nvcr.io/nvidia/pytorch:20.11-py3
-# FROM rocm/pytorch
-# RUN apt install libxml2
-RUN conda update icu
+FROM pytorch/pytorch
+
+# basic requirements
+RUN apt-get -y update
+RUN apt-get -y install apt-utils
+RUN apt-get -y install build-essential autotools-dev \
+    make git curl vim wget rsync jq openssh-server openssh-client sudo \
+    iputils-ping net-tools ethtool libcap2 \
+    automake autoconf libtool flex doxygen \
+    perl lsb-release iproute2 pciutils graphviz \
+    bc tar git bash pbzip2 pv bzip2 unzip cabextract \
+    g++ gcc \
+    && apt-get autoremove
+
+# CMake
+ENV CMAKE_VERSION=3.18.2
+RUN cd /usr/local && \
+    wget -q -O - https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz | tar zxf -
+ENV PATH=/usr/local/cmake-${CMAKE_VERSION}-Linux-x86_64/bin:${PATH}
+
+# Triton
 COPY . /root/triton
 RUN cd /root/triton/python && \
     pip install --verbose -e .
