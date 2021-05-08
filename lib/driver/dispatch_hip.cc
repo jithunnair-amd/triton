@@ -96,8 +96,7 @@ bool dispatch::cuinit(){
   std::cout << "dispatch::cuinit" << std::endl;
   if(hip_==nullptr){
     putenv((char*)"HIP_CACHE_DISABLE=1");
-    // std::string libhip = tools::getenv("TRITON_LIBCUDA");
-    std::string libhip = "/opt/rocm/include/hip/hip_runtime.h";
+    std::string libhip = tools::getenv("TRITON_LIBCUDA");
     std::cout << "libhip: " << libhip << std::endl;
     if(libhip.empty())
       hip_ = dlopen("libhip.so", RTLD_LAZY);

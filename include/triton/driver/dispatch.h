@@ -44,6 +44,7 @@ protected:
   template<f_init_t initializer, typename FunPtrT, typename... Args>
   static typename return_type<FunPtrT>::type f_impl(void*& lib_h, FunPtrT, void*& cache, const char * name, Args... args)
   {
+    std::cout << "f_impl: " << name << std::endl;
     initializer();
     if(cache == nullptr){
       cache = dlsym(lib_h, name);
