@@ -18,6 +18,10 @@ RUN cd /usr/local && \
     wget -q -O - https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz | tar zxf -
 ENV PATH=/usr/local/cmake-${CMAKE_VERSION}-Linux-x86_64/bin:${PATH}
 
+
+# pip dependcies
+RUN pip3 install pytest
+
 # Triton
 COPY . /root/triton
 RUN cd /root/triton/python && \
