@@ -93,7 +93,7 @@ namespace driver
 
 
 bool dispatch::cuinit(){
-  std::cout << "dispatch::cuinit" << std::endl;
+  std::cout << "dispatch_hip::cuinit" << std::endl;
   if(hip_==nullptr){
     putenv((char*)"HIP_CACHE_DISABLE=1");
     std::string libhip = tools::getenv("TRITON_LIBCUDA");
