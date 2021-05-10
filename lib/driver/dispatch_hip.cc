@@ -96,17 +96,20 @@ bool dispatch::cuinit(){
   std::cout << "dispatch_hip::cuinit" << std::endl;
   if(hip_==nullptr){
     putenv((char*)"HIP_CACHE_DISABLE=1");
-    std::string libhip = tools::getenv("TRITON_LIBCUDA");
+    std::string libhip = tools::getenv("TRITON_LIBHIP");
     std::cout << "libhip: " << libhip << std::endl;
     if(libhip.empty())
-      hip_ = dlopen("libhip.so", RTLD_LAZY);
+      hip_ = dlopen("libamdhip64.so", RTLD_LAZY);
     else
       hip_ = dlopen(libhip.c_str(), RTLD_LAZY);
   }
   if(hip_ == nullptr)
+    std::cout << "hip_ was not loaded correctly" << std::endl;
     return false;
   hipError_t (*fptr)(unsigned int);
+  std::cout << "before dlsym" << std::endl;
   hipInit_ = dlsym(hip_, "hipInit");
+  std::cout << "after dlsym" << std::endl;
   *reinterpret_cast<void **>(&fptr) = hipInit_;
   hipError_t res = (*fptr)(0);
   check(res);

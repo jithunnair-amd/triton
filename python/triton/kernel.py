@@ -89,7 +89,7 @@ class kernel:
                 self.device_id = torch.cuda.current_device() if device.index is None else device.index
                 self.device = _triton.driver.hip_device(self.device_id, False)
                 cu_stream = torch.cuda.current_stream(self.device_id).cuda_stream
-                self.stream = _triton.driver.cu_stream(cu_stream, False)
+                self.stream = _triton.driver.hip_stream(cu_stream, False)
             else:
                 self.device_id = torch.cuda.current_device() if device.index is None else device.index
                 self.device = _triton.driver.cu_device(self.device_id, False)
@@ -119,6 +119,7 @@ class kernel:
         torch.cuda.set_device(self.device_id)
         # pack parameters into a byte buffer
         params = struct.pack(self.tys, *args)
+        print(params, grid, self.stream)
         kernel = self.fn.autotune(params, grid, self.stream)
         # run kernel
         grid = grid(kernel.opt)

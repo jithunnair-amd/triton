@@ -49,10 +49,11 @@ protected:
     initializer();
     if(cache == nullptr){
       cache = dlsym(lib_h, name);
-			if(cache == 0)
+			if(cache == 0){
         std::cout << "dlsym cannot find " << name << std::endl;
         throw std::runtime_error("dlsym unable to load HIP function");
-		}
+      }
+    }
     FunPtrT fptr;
     *reinterpret_cast<void **>(&fptr) = cache;
     typename return_type<FunPtrT>::type res = (*fptr)(args...);
