@@ -91,6 +91,7 @@ module::module(host_module_t mod, bool has_ownership)
 
 
 module* module::create(driver::device* device, std::unique_ptr<llvm::Module> src) {
+  std::cout << "module_hip::create" << std::endl;
   switch(device->backend()){
     case CUDA: return new cu_module(device, std::move(src));
     case Host: return new host_module(std::move(src));

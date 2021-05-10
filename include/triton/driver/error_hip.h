@@ -38,7 +38,7 @@ namespace triton
   {
   class base: public std::exception{};
 
-#define TRITON_CREATE_CUDA_EXCEPTION(name, msg) class name: public base { public:const char * what() const throw(){ return "CUDA: Error- " msg; } }
+#define TRITON_CREATE_CUDA_EXCEPTION(name, msg) class name: public base { public:const char * what() const throw(){ return "HIP: Error- " msg; } }
 
 
   TRITON_CREATE_CUDA_EXCEPTION(invalid_value                   ,"invalid value");

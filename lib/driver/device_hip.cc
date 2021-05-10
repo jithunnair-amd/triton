@@ -174,7 +174,8 @@ std::string hip_device::infos() const{
 
 // target
 std::unique_ptr<codegen::target> hip_device::make_target() const {
-  return std::unique_ptr<codegen::nvidia_cu_target>(new codegen::nvidia_cu_target(compute_capability()));
+  std::cout << "hip_device::make_target" << std::endl;
+  return std::unique_ptr<codegen::amd_cl_target>(new codegen::amd_cl_target());
 }
 
 
