@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
 include(ExternalProject)
 
-set(USE_ROCM FALSE)
+set(USE_ROCM TRUE)
 
 # Trigger hipify if it is ROCm build
 # if (USE_ROCM)
