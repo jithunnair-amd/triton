@@ -8,7 +8,11 @@
 #include <dlfcn.h>
 
 //HIP Backend
-#include "triton/external/CUDA/hip.h"
+#define __HIP_PLATFORM_HCC__
+#include "hip/hip_runtime.h"
+
+
+// #include "triton/external/CUDA/hip.h"
 #include "triton/external/CUDA/nvml_hip.h"
 
 //Exceptions
