@@ -103,15 +103,18 @@ bool dispatch::cuinit(){
     else
       hip_ = dlopen(libhip.c_str(), RTLD_LAZY);
   }
-  if(hip_ == nullptr)
+  if(hip_ == nullptr){
     std::cout << "hip_ was not loaded correctly" << std::endl;
     return false;
+  }
+
   hipError_t (*fptr)(unsigned int);
   std::cout << "before dlsym" << std::endl;
   hipInit_ = dlsym(hip_, "hipInit");
   std::cout << "after dlsym" << std::endl;
   *reinterpret_cast<void **>(&fptr) = hipInit_;
   hipError_t res = (*fptr)(0);
+  std::cout << "res: " << res << std::endl;
   check(res);
   return true;
 }
@@ -145,8 +148,8 @@ CUDA_DEFINE3(hipError_t, hipEventElapsedTime, float *, hipEvent_t, hipEvent_t)
 CUDA_DEFINE1(hipError_t, hipFree, hipDeviceptr_t)
 CUDA_DEFINE4(hipError_t, hipMemcpyDtoHAsync, void *, hipDeviceptr_t, size_t, hipStream_t)
 CUDA_DEFINE1(hipError_t, hipDriverGetVersion, int *)
-CUDA_DEFINE3(hipError_t, hipDeviceGetName, char *, int, hipDevice_t)
-CUDA_DEFINE3(hipError_t, hipDeviceGetPCIBusId, char *, int, hipDevice_t)
+CUDA_DEFINE3(hipError_t, hipDeviceGetName, char *, int, int)
+CUDA_DEFINE3(hipError_t, hipDeviceGetPCIBusId, char *, int, int)
 CUDA_DEFINE4(hipError_t, hipModuleGetGlobal, hipDeviceptr_t*, size_t*, hipModule_t, const char*)
 
 CUDA_DEFINE4(hipError_t, hipMemcpyHtoDAsync, hipDeviceptr_t, const void *, size_t, hipStream_t)
@@ -154,7 +157,7 @@ CUDA_DEFINE2(hipError_t, hipModuleLoad, hipModule_t *, const char *)
 CUDA_DEFINE11(hipError_t, hipModuleLaunchKernel, hipFunction_t, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, hipStream_t, void **, void **)
 CUDA_DEFINE1(hipError_t, hipModuleUnload, hipModule_t)
 CUDA_DEFINE5(hipError_t, hipModuleLoadDataEx, hipModule_t *, const void *, unsigned int, hipJitOption *, void **)
-CUDA_DEFINE3(hipError_t, hipDeviceGetAttribute, int *, hipDeviceAttribute_t, hipDevice_t)
+CUDA_DEFINE3(hipError_t, hipDeviceGetAttribute, int *, hipDeviceAttribute_t, int)
 CUDA_DEFINE1(hipError_t, hipGetDeviceCount, int *)
 CUDA_DEFINE3(hipError_t, hipMemcpyHtoD, hipDeviceptr_t, const void *, size_t )
 CUDA_DEFINE1(hipError_t, hipInit, unsigned int)

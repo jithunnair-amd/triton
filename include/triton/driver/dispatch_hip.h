@@ -46,8 +46,11 @@ protected:
   static typename return_type<FunPtrT>::type f_impl(void*& lib_h, FunPtrT, void*& cache, const char * name, Args... args)
   {
     std::cout << "f_impl: " << name << std::endl;
-    initializer();
+    initializer(); // cuinit
+    std::cout << "f_impl: after cuinit"<< std::endl;
+
     if(cache == nullptr){
+      std::cout << "f_impl: cache empty"<< std::endl;
       cache = dlsym(lib_h, name);
 			if(cache == 0){
         std::cout << "dlsym cannot find " << name << std::endl;
@@ -57,6 +60,7 @@ protected:
     FunPtrT fptr;
     *reinterpret_cast<void **>(&fptr) = cache;
     typename return_type<FunPtrT>::type res = (*fptr)(args...);
+    std::cout << "f_impl:res " << res << std::endl;
     check(res);
     return res;
   }
@@ -79,15 +83,15 @@ public:
   static hipError_t hipFree(hipDeviceptr_t dptr);
   static hipError_t hipMemcpyDtoHAsync(void *dstHost, hipDeviceptr_t srcDevice, size_t ByteCount, hipStream_t hStream);
   static hipError_t hipDriverGetVersion(int *driverVersion);
-  static hipError_t hipDeviceGetName(char *name, int len, hipDevice_t dev);
-  static hipError_t hipDeviceGetPCIBusId(char *id, int len, hipDevice_t dev);
+  static hipError_t hipDeviceGetName(char *name, int len, int dev);
+  static hipError_t hipDeviceGetPCIBusId(char *id, int len, int dev);
   static hipError_t hipModuleGetGlobal(hipDeviceptr_t *dptr, size_t* bytes, hipModule_t hmod, const char *name);
   static hipError_t hipMemcpyHtoDAsync(hipDeviceptr_t dstDevice, const void *srcHost, size_t ByteCount, hipStream_t hStream);
   static hipError_t hipModuleLoad(hipModule_t *module, const char *fname);
   static hipError_t hipModuleLaunchKernel(hipFunction_t f, unsigned int gridDimX, unsigned int gridDimY, unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY, unsigned int blockDimZ, unsigned int sharedMemBytes, hipStream_t hStream, void **kernelParams, void **extra);
   static hipError_t hipModuleUnload(hipModule_t hmod);
   static hipError_t hipModuleLoadDataEx(hipModule_t *module, const void *image, unsigned int numOptions, hipJitOption *options, void **optionValues);
-  static hipError_t hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attrib, hipDevice_t dev);
+  static hipError_t hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attrib, int dev);
   static hipError_t hipGetDeviceCount(int *count);
   static hipError_t hipMemcpyHtoD(hipDeviceptr_t dstDevice, const void *srcHost, size_t ByteCount);
   static hipError_t hipInit(unsigned int Flags);

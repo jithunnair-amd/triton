@@ -52,6 +52,7 @@ std::unique_ptr<codegen::target> host_device::make_target() const {
 // information query
 template<hipDeviceAttribute_t attr>
 int hip_device::hipGetInfo() const{
+  std::cout << "hip_device::hipGetInfo" << std::endl;
   int res;
   dispatch::hipDeviceGetAttribute(&res, attr, *cu_);
   return res;
@@ -95,11 +96,14 @@ void hip_device::interpret_as(int cc){
 
 // compute capability
 int hip_device::compute_capability() const {
+  std::cout << "hip_device::compute_capability" << std::endl;
   if(interpreted_as_)
     return *interpreted_as_;
   size_t major = hipGetInfo<hipDeviceAttributeComputeCapabilityMajor>();
   size_t minor = hipGetInfo<hipDeviceAttributeComputeCapabilityMinor>();
-  return major*10 + minor;
+  int sm=major*10 + minor;
+  std::cout << "hip_device::compute_capability" << sm << std::endl;
+  return sm;
 }
 
 // maximum number of threads per block
@@ -175,7 +179,8 @@ std::string hip_device::infos() const{
 // target
 std::unique_ptr<codegen::target> hip_device::make_target() const {
   std::cout << "hip_device::make_target" << std::endl;
-  return std::unique_ptr<codegen::amd_cl_target>(new codegen::amd_cl_target());
+  return std::unique_ptr<codegen::nvidia_cu_target>(new codegen::nvidia_cu_target(compute_capability()));
+  // return std::unique_ptr<codegen::amd_cl_target>(new codegen::amd_cl_target());
 }
 
 

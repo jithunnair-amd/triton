@@ -80,6 +80,7 @@ std::vector<driver::platform*> backend::platforms::cache_;
 /*-----------------------------------*/
 
 void backend::devices::init(std::vector<platform*> const & platforms) {
+  std::cout << "backend::devices::init()" << std::endl;
   if(!cache_.empty())
     return;
   for(driver::platform* pf: platforms)
