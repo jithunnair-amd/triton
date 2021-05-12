@@ -93,7 +93,7 @@ namespace driver
 
 
 bool dispatch::cuinit(){
-  std::cout << "dispatch_hip::cuinit" << std::endl;
+  // std::cout << "dispatch_hip::cuinit" << std::endl;
   if(hip_==nullptr){
     putenv((char*)"HIP_CACHE_DISABLE=1");
     std::string libhip = tools::getenv("TRITON_LIBHIP");
@@ -109,12 +109,12 @@ bool dispatch::cuinit(){
   }
 
   hipError_t (*fptr)(unsigned int);
-  std::cout << "before dlsym" << std::endl;
+  // std::cout << "before dlsym" << std::endl;
   hipInit_ = dlsym(hip_, "hipInit");
-  std::cout << "after dlsym" << std::endl;
+  // std::cout << "after dlsym" << std::endl;
   *reinterpret_cast<void **>(&fptr) = hipInit_;
   hipError_t res = (*fptr)(0);
-  std::cout << "res: " << res << std::endl;
+  // std::cout << "res: " << res << std::endl;
   check(res);
   return true;
 }

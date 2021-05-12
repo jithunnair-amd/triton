@@ -124,16 +124,16 @@ std::tuple<std::shared_ptr<driver::module>,
            size_t> kernel::ir_to_bin(ir::module &ir, driver::device* dev, const options_t& opt) {
   std::cout << "function_hip::kernel::driver" << std::endl;
   // generate llvm code
-  std::cout << "function_hip::kernel::driver: generate llvm code" << std::endl;
+  // std::cout << "function_hip::kernel::driver: generate llvm code" << std::endl;
   llvm::LLVMContext ctx;
   std::string name = ir.get_function_list()[0]->get_name();
   std::unique_ptr<llvm::Module> llvm(new llvm::Module(name, ctx));
   // optimizations
-  std::cout << "function_hip::kernel::driver: optimizations" << std::endl;
+  // std::cout << "function_hip::kernel::driver: optimizations" << std::endl;
   std::unique_ptr<codegen::target> target = dev->make_target();
   bool cts_use_async = target->as_nvidia()->sm() >= 80;
   // create passes
-  std::cout << "function_hip::kernel::driver: create passes" << std::endl;
+  // std::cout << "function_hip::kernel::driver: create passes" << std::endl;
   codegen::analysis::align align;
   codegen::analysis::axes axes;
   codegen::transform::cts cts(cts_use_async);
@@ -150,7 +150,7 @@ std::tuple<std::shared_ptr<driver::module>,
   codegen::transform::coalesce coalesce(&align, &layouts);
   codegen::generator isel(&axes, &layouts, &align, &allocation, &swizzle, target.get(), opt.num_warps);
   // run passes
-  std::cout << "function_hip::kernel::driver: run passes" << std::endl;
+  // std::cout << "function_hip::kernel::driver: run passes" << std::endl;
   dce.run(ir);
   peephole.run(ir);
   dce.run(ir);
@@ -199,17 +199,17 @@ std::tuple<std::shared_ptr<driver::module>,
 
 kernel::kernel(const std::string& src, const options_t& opt, driver::device *dev, const std::map<int, ir::attribute> &attrs):
   opt(opt), dev_(dev) {
-  std::cout << "function_hip::kernel::kernel" << std::endl;
+  // std::cout << "function_hip::kernel::kernel" << std::endl;
   // compile to Triton IR
-  std::cout << "function_hip::kernel::kernel: compile to Triton IR" << std::endl;
+  // std::cout << "function_hip::kernel::kernel: compile to Triton IR" << std::endl;
   ir_ = src_to_ir(src, opt);
   // add attributes
-  std::cout << "function_hip::kernel::kernel: add attributes" << std::endl;
+  // std::cout << "function_hip::kernel::kernel: add attributes" << std::endl;
   for(const auto&x: attrs)
     ir_->get_function_list()[0]->add_attr(x.first, x.second);
   
   // compile to binary
-  std::cout << "function_hip::kernel::kernel: compile to binary" << std::endl;
+  // std::cout << "function_hip::kernel::kernel: compile to binary" << std::endl;
   std::tie(mod_, ker_, shared_mem_) = ir_to_bin(*ir_, dev, opt);
 }
 
@@ -314,7 +314,7 @@ kernel* function::autotune(const std::string &args, const grid_fn_ty& grid_fn, d
   std::cout << "function_hip::autotune" << std::endl;
   
   // align key
-  std::cout << "function_hip::autotune: align key" << std::endl;
+  // std::cout << "function_hip::autotune: align key" << std::endl;
   std::vector<uint64_t> rt_key(align_idxs_.size(), 0);
   for(size_t i = 0; i < align_idxs_.size(); i++){
     int idx = align_idxs_[i];
@@ -323,14 +323,14 @@ kernel* function::autotune(const std::string &args, const grid_fn_ty& grid_fn, d
     rt_key[i] = pow2_divisor(tmp);
   }
   // auto-tuning key
-   std::cout << "function_hip::autotune: auto-tuning key" << std::endl;
+  //  std::cout << "function_hip::autotune: auto-tuning key" << std::endl;
   std::vector<uint64_t> at_key(key_idxs_.size(), 0);
   for(size_t i = 0; i < at_key.size(); i++){
     int idx = key_idxs_[i];
     std::memcpy((void*)&at_key[i], (void*)((char*)args.data() + arg_off_[idx]), arg_size_[idx]);
   }
   // cache key
-   std::cout << "function_hip::autotune: cache key" << std::endl;
+  //  std::cout << "function_hip::autotune: cache key" << std::endl;
   std::vector<uint64_t> cache_key;
   cache_key.reserve(rt_key.size() + at_key.size());
   cache_key.insert(cache_key.end(), rt_key.begin(), rt_key.end());
@@ -339,21 +339,21 @@ kernel* function::autotune(const std::string &args, const grid_fn_ty& grid_fn, d
   if(it != cache_.end())
     return it->second;
   // compile kernels
-   std::cout << "function_hip::autotune: compile kernels" << std::endl;
+  //  std::cout << "function_hip::autotune: compile kernels" << std::endl;
   if(kernels_.find(rt_key) == kernels_.end()){
-    std::cout << "function_hip::autotune: compile kernels: loop 1" << std::endl;
+    // std::cout << "function_hip::autotune: compile kernels: loop 1" << std::endl;
     std::map<int, ir::attribute> attrs;
     for(size_t i = 0; i < align_idxs_.size(); i++){
       bool is_ptr = sig_[align_idxs_[i]] == BUFFER_T;
       attrs.insert({align_idxs_[i] + 1, ir::attribute(is_ptr ? ir::aligned : ir::multiple_of, rt_key[i])});
     }
 
-    std::cout << "function_hip::autotune: compile kernels: loop 2" << std::endl;
+    // std::cout << "function_hip::autotune: compile kernels: loop 2" << std::endl;
     for(const options_t& opt: opts_)
       kernels_[rt_key].emplace_back(new kernel(src_, opt, device_, attrs));
   }
   // run auto-tuner
-  std::cout << "function_hip::autotune: run auto-tuner" << std::endl;
+  // std::cout << "function_hip::autotune: run auto-tuner" << std::endl;
   double best_ts = INFINITY;
   auto& kernels = kernels_.at(rt_key);
   kernel* ret = nullptr;

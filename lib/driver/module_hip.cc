@@ -70,6 +70,7 @@ namespace driver
 /* ------------------------ */
 
 void module::init_llvm() {
+  std::cout << "module::init_llvm:" << std::endl;
   static bool init = false;
   if(!init){
     llvm::InitializeAllTargetInfos();
@@ -215,6 +216,7 @@ static std::map<int, int> vptx = {
 };
 
 std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module, driver::device* device) {
+  std::cout << "cu_module::compile_llvm_module" << std::endl;
   // LLVM version in use may not officially support target hardware
   int max_nvvm_cc = 75;
   int max_nvvm_ptx = 64;
@@ -228,16 +230,21 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   std::string sm = "sm_" + std::to_string(cc);
   // driver version
   int version;
+  // std::cout << "cu_module::compile_llvm_module: before hipDriverGetVersion" << std::endl;
   dispatch::hipDriverGetVersion(&version);
+  // std::cout << "cu_module::compile_llvm_module: after hipDriverGetVersion: " << version << std::endl;
   int major = version / 1000;
   int minor = (version - major*1000) / 10;
   if(major < 10)
     throw std::runtime_error("Triton requires CUDA 10+");
   // PTX version
-  int ptx = vptx.at(version);
+  // std::cout << "cu_module::compile_llvm_module: PTX version" << std::endl;
+  // int ptx = vptx.at(version);
+  int ptx = 63;
   int ptx_major = ptx / 10;
   int ptx_minor = ptx % 10;
   // create
+  // std::cout << "cu_module::compile_llvm_module: create" << std::endl;
   llvm::SmallVector<char, 0> buffer;
   std::string triple = "nvptx64-nvidia-cuda";
   std::string proc = "sm_" + std::to_string(std::min(cc, max_nvvm_cc));
@@ -245,10 +252,12 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   std::string features = "+ptx" + std::to_string(std::min(ptx, max_nvvm_ptx));
   init_llvm();
   // verify and store llvm
+  // std::cout << "cu_module::compile_llvm_module: verify and store llvm" << std::endl;
   llvm::legacy::PassManager pm;
   pm.add(llvm::createVerifierPass());
   pm.run(*module);
   // create machine
+  // std::cout << "cu_module::compile_llvm_module: create machine" << std::endl;
   module->setTargetTriple(triple);
   std::string error;
   auto target = llvm::TargetRegistry::lookupTarget(module->getTargetTriple(), error);
@@ -260,20 +269,24 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   llvm::TargetMachine *machine = target->createTargetMachine(module->getTargetTriple(), proc, features, opt,
                                                              llvm::Reloc::PIC_, llvm::None, llvm::CodeGenOpt::Aggressive);
   // set data layout
+  // std::cout << "cu_module::compile_llvm_module: set data layout" << std::endl;
   if(layout.empty())
     module->setDataLayout(machine->createDataLayout());
   else
     module->setDataLayout(layout);
   // emit machine code
+  // std::cout << "cu_module::compile_llvm_module: emit machine code" << std::endl;
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
   llvm::legacy::PassManager pass;
   llvm::raw_svector_ostream stream(buffer);
   // emit
+  // std::cout << "cu_module::compile_llvm_module: emit" << std::endl;
   machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_AssemblyFile);
   pass.run(*module);
 
   // post-process
+  // std::cout << "cu_module::compile_llvm_module: post-process" << std::endl;
   std::string result(buffer.begin(), buffer.end());
   find_and_replace(result, ".version", "\n", ".version " + std::to_string(ptx_major) + "." + std::to_string(ptx_minor) + "\n");
   find_and_replace(result, ".target", "\n", ".target " + sm + "\n");
@@ -283,6 +296,7 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
 }
 
 void cu_module::init_from_ptx(const std::string& ptx) {
+  std::cout << "cu_module::init_from_ptx" << std::endl;
   // JIT compile source-code
 //  std::cout << ptx << std::endl;
 
@@ -340,7 +354,7 @@ void cu_module::init_from_ptx(const std::string& ptx) {
   }
   catch(exception::cuda::invalid_ptx const &){
 //#ifdef TRITON_LOG_PTX_ERROR
-    std::cout << ptx << std::endl;
+    // std::cout << ptx << std::endl;
     std::cerr << "It appears that Triton produced invalid PTX code:" << std::endl;
 //    exit(1);
 //#endif

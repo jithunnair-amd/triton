@@ -37,12 +37,14 @@ namespace driver
 /* ------------------------ */
 
 std::string cu_platform::version() const{
+  std::cout << "cu_platform::version" << std::endl;
   int version;
   dispatch::hipDriverGetVersion(&version);
   return std::to_string(version);
 }
 
 void cu_platform::devices(std::vector<device *> &devices) const{
+  std::cout << "cu_platform::version" << std::endl;
   int N;
   dispatch::hipGetDeviceCount(&N);
   for(int i = 0 ; i < N ; ++i){

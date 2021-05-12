@@ -51,10 +51,10 @@ protected:
   {
     std::cout << "f_impl: " << name << std::endl;
     initializer(); // cuinit
-    std::cout << "f_impl: after cuinit"<< std::endl;
+    // std::cout << "f_impl: after cuinit"<< std::endl;
 
     if(cache == nullptr){
-      std::cout << "f_impl: cache empty"<< std::endl;
+      // std::cout << "f_impl: cache empty"<< std::endl;
       cache = dlsym(lib_h, name);
 			if(cache == 0){
         std::cout << "dlsym cannot find " << name << std::endl;
@@ -64,7 +64,7 @@ protected:
     FunPtrT fptr;
     *reinterpret_cast<void **>(&fptr) = cache;
     typename return_type<FunPtrT>::type res = (*fptr)(args...);
-    std::cout << "f_impl:res " << res << std::endl;
+    // std::cout << "f_impl:res " << res << std::endl;
     check(res);
     return res;
   }

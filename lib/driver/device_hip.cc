@@ -60,6 +60,7 @@ int hip_device::hipGetInfo() const{
 
 // convert to nvml
 nvmlDevice_t hip_device::nvml_device() const{
+  std::cout << "hip_device::nvml_device" << std::endl;
   std::map<std::string, nvmlDevice_t> map;
   std::string key = pci_bus_id();
   if(map.find(key)==map.end()){
@@ -72,11 +73,13 @@ nvmlDevice_t hip_device::nvml_device() const{
 
 // number of address bits
 size_t hip_device::address_bits() const{
+  std::cout << "hip_device::address_bits" << std::endl;
   return sizeof(size_t)*8;
 }
 
 // name
 std::string hip_device::name() const {
+    std::cout << "hip_device::name" << std::endl;
     char tmp[128];
     dispatch::hipDeviceGetName(tmp, 128, *cu_);
     return std::string(tmp);
@@ -84,6 +87,7 @@ std::string hip_device::name() const {
 
 // PCI bus ID
 std::string hip_device::pci_bus_id() const{
+  std::cout << "hip_device::pci_bus_id" << std::endl;
   char tmp[128];
   dispatch::hipDeviceGetPCIBusId(tmp, 128, *cu_);
   return std::string(tmp);
@@ -91,6 +95,7 @@ std::string hip_device::pci_bus_id() const{
 
 // force the device to be interpreted as a particular cc
 void hip_device::interpret_as(int cc){
+  std::cout << "hip_device::interpret_as" << std::endl;
   interpreted_as_ = std::make_shared<int>(cc);
 }
 
@@ -102,28 +107,32 @@ int hip_device::compute_capability() const {
   size_t major = hipGetInfo<hipDeviceAttributeComputeCapabilityMajor>();
   size_t minor = hipGetInfo<hipDeviceAttributeComputeCapabilityMinor>();
   int sm=major*10 + minor;
-  std::cout << "hip_device::compute_capability" << sm << std::endl;
+  std::cout << "hip_device::compute_capability: " << sm << std::endl;
   return sm;
 }
 
 // maximum number of threads per block
 size_t hip_device::max_threads_per_block() const {
+  std::cout << "hip_device::max_threads_per_block" << std::endl;
   return hipGetInfo<hipDeviceAttributeMaxThreadsPerBlock>();
 }
 
 // maximum amount of shared memory per block
 size_t hip_device::max_shared_memory() const {
+  std::cout << "hip_device::max_shared_memory" << std::endl;
   return hipGetInfo<hipDeviceAttributeMaxSharedMemoryPerBlock>();
 }
 
 // warp size
 size_t hip_device::warp_size() const {
+  std::cout << "hip_device::warp_size" << std::endl;
   return hipGetInfo<hipDeviceAttributeWarpSize>();
 }
 
 
 // maximum block dimensions
 std::vector<size_t> hip_device::max_block_dim() const {
+  std::cout << "hip_device::max_block_dim" << std::endl;
   std::vector<size_t> result(3);
   result[0] = hipGetInfo<hipDeviceAttributeMaxBlockDimX>();
   result[1] = hipGetInfo<hipDeviceAttributeMaxBlockDimY>();
@@ -133,6 +142,7 @@ std::vector<size_t> hip_device::max_block_dim() const {
 
 // current SM clock
 size_t hip_device::current_sm_clock() const{
+  std::cout << "hip_device::current_sm_clock" << std::endl;
   unsigned int result;
   dispatch::nvmlDeviceGetClockInfo(nvml_device(), NVML_CLOCK_SM, &result);
   return result;
@@ -140,6 +150,7 @@ size_t hip_device::current_sm_clock() const{
 
 // max SM clock
 size_t hip_device::max_sm_clock() const{
+  std::cout << "hip_device::max_sm_clock" << std::endl;
   unsigned int result;
   dispatch::nvmlDeviceGetMaxClockInfo(nvml_device(), NVML_CLOCK_SM, &result);
   return result;
@@ -147,6 +158,7 @@ size_t hip_device::max_sm_clock() const{
 
 // current memory clock
 size_t hip_device::current_mem_clock() const{
+  std::cout << "hip_device::current_mem_clock" << std::endl;
   unsigned int result;
   dispatch::nvmlDeviceGetClockInfo(nvml_device(), NVML_CLOCK_MEM, &result);
   return result;
@@ -154,6 +166,7 @@ size_t hip_device::current_mem_clock() const{
 
 // max memory clock
 size_t hip_device::max_mem_clock() const{
+  std::cout << "hip_device::max_mem_clock" << std::endl;
   unsigned int result;
   dispatch::nvmlDeviceGetMaxClockInfo(nvml_device(), NVML_CLOCK_MEM, &result);
   return result;
@@ -161,11 +174,13 @@ size_t hip_device::max_mem_clock() const{
 
 // max memory clock
 void hip_device::set_max_clock() {
+  std::cout << "hip_device::set_max_clock" << std::endl;
   dispatch::nvmlDeviceSetApplicationsClocks(nvml_device(), max_mem_clock(), max_sm_clock());
 }
 
 // print infos
 std::string hip_device::infos() const{
+  std::cout << "hip_device::infos" << std::endl;
   std::ostringstream oss;
   std::vector<size_t> max_wi_sizes = max_block_dim();
   oss << "Platform: CUDA" << std::endl;

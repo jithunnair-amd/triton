@@ -31,8 +31,11 @@ namespace driver
 
 void check(hipError_t err)
 {
-  std::cout << "error_hip::check" << std::endl;
-  std::cout << "err: " << err << std::endl;
+  if (err != 0)
+  {
+    std::cout << "error_hip::check: " << err << std::endl;
+  }
+
   using namespace exception::cuda;
   switch(err)
   {
