@@ -82,7 +82,7 @@ public:
   static hipError_t hipEventCreate(hipEvent_t *phEvent, unsigned int Flags);
   static hipError_t hipGetDevice(hipDevice_t *device, int ordinal);
   static hipError_t hipMemcpyDtoH(void *dstHost, hipDeviceptr_t srcDevice, size_t ByteCount);
-  static hipError_t hipStreamCreate__(hipStream_t *phStream, unsigned int Flags);
+  static hipError_t hipStreamCreate__(hipStream_t *phStream, unsigned int Flags); // replace with hipStreamCreateWithFlags
   static hipError_t hipEventElapsedTime(float *pMilliseconds, hipEvent_t hStart, hipEvent_t hEnd);
   static hipError_t hipFree(hipDeviceptr_t dptr);
   static hipError_t hipMemcpyDtoHAsync(void *dstHost, hipDeviceptr_t srcDevice, size_t ByteCount, hipStream_t hStream);
