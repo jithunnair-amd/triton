@@ -226,7 +226,8 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   assert(short_ptr);
   short_ptr->setValue(true);
   // compute capability
-  int cc = ((driver::hip_device*)device)->compute_capability();
+  // int cc = ((driver::hip_device*)device)->compute_capability();
+  int cc = 90;
   std::string sm = "sm_" + std::to_string(cc);
   // driver version
   int version;
@@ -355,6 +356,10 @@ void cu_module::init_from_ptx(const std::string& ptx) {
   catch(exception::cuda::invalid_ptx const &){
 //#ifdef TRITON_LOG_PTX_ERROR
     // std::cout << ptx << std::endl;
+    std::ofstream out("ptx.hip");
+    out << ptx;
+    out.close();
+
     std::cerr << "It appears that Triton produced invalid PTX code:" << std::endl;
 //    exit(1);
 //#endif
@@ -363,13 +368,19 @@ void cu_module::init_from_ptx(const std::string& ptx) {
 }
 
 cu_module::cu_module(driver::device* device, std::unique_ptr<llvm::Module> ll_module): module(hipModule_t(), true) {
+  std::cout << "cu_module::cu_module" << std::endl;
   llvm::raw_string_ostream oss(llir_);
   oss << *ll_module;
   oss.flush();
   std::string cache_path = tools::getenv("TRITON_DEBUG_CACHE_PATH");
-  if(cache_path.empty())
+  if (cache_path.empty())
+  {
+    std::cout << "cu_module::cu_module: cache_path empty" << std::endl;
     ptx_ = compile_llvm_module(std::move(ll_module), device);
-  else{
+  }
+  else
+  {
+    std::cout << "cu_module::cu_module: cache_path not empty" << std::endl;
     tools::mkdir(cache_path);
     // update cache path to PTX file
     unsigned char hash[20];
@@ -395,10 +406,12 @@ cu_module::cu_module(driver::device* device, std::unique_ptr<llvm::Module> ll_mo
 }
 
 cu_module::cu_module(driver::device*, std::string const & source) : module(hipModule_t(), true), ptx_(source){
+  std::cout << "cu_module::cu_module" << std::endl;
   init_from_ptx(ptx_);
 }
 
 std::unique_ptr<buffer> cu_module::symbol(const char *name) const{
+  std::cout << "cu_module::symbol" << std::endl;
   hipDeviceptr_t handle;
   size_t size;
   dispatch::hipModuleGetGlobal(&handle, &size, *cu_, name);
