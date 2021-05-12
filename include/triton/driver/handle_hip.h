@@ -33,7 +33,6 @@ namespace driver
 {
 
 enum backend_t {
-  HIP,
   CUDA,
   Host
 };
@@ -126,7 +125,7 @@ protected:
 template<class CUType, class HostType>
 class polymorphic_resource {
 public:
-  polymorphic_resource(CUType cu, bool take_ownership): cu_(cu, take_ownership), backend_(HIP){}
+  polymorphic_resource(CUType cu, bool take_ownership): cu_(cu, take_ownership), backend_(CUDA){}
   polymorphic_resource(HostType hst, bool take_ownership): hst_(hst, take_ownership), backend_(Host){}
   virtual ~polymorphic_resource() { }
 

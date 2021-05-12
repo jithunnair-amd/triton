@@ -40,11 +40,11 @@ inline void _delete(host_buffer_t x)   { if(x.data) delete[] x.data; }
 inline void _delete(host_function_t) { }
 
 //CUDA
-inline void _delete(hipCtx_t x) { dispatch::cuCtxDestroy(x); }
-inline void _delete(hipDeviceptr_t x) { dispatch::cuMemFree(x); }
-inline void _delete(hipStream_t x) { dispatch::cuStreamDestroy(x); }
+inline void _delete(hipCtx_t x) { dispatch::hipCtxDestroy(x); }
+inline void _delete(hipDeviceptr_t x) { dispatch::hipFree(x); }
+inline void _delete(hipStream_t x) { dispatch::hipStreamDestroy(x); }
 inline void _delete(hipDevice_t) { }
-inline void _delete(hipEvent_t x) { dispatch::cuEventDestroy(x); }
+inline void _delete(hipEvent_t x) { dispatch::hipEventDestroy(x); }
 inline void _delete(hipFunction_t) { }
 inline void _delete(hipModule_t x) { dispatch::hipModuleUnload(x); }
 inline void _delete(cu_event_t x) { _delete(x.first); _delete(x.second); }

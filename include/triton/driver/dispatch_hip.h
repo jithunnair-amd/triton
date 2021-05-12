@@ -109,12 +109,12 @@ public:
   static hipError_t hipStreamDestroy(hipStream_t hStream);
   static hipError_t hipEventDestroy(hipEvent_t hEvent);
   static hipError_t hipMalloc(hipDeviceptr_t *dptr, size_t bytesize);
-  static hipError_t hipPointerGetAttribute(void * data, CUpointer_attribute attribute, hipDeviceptr_t ptr);
+  static hipError_t hipPointerGetAttribute(void * data, hipPointerAttribute_t attribute, hipDeviceptr_t ptr);
   static hipError_t hipCtxGetDevice(hipDevice_t* result);
   static hipError_t hipMemsetD8Async(hipDeviceptr_t dst, unsigned char x, size_t N, hipStream_t stream);
-  static hipError_t hipFuncGetAttribute(int* pi, hipFuncAttribute_t attrib, hipFunction_t hfunc);
-  static hipError_t cuFuncSetAttribute(hipFunction_t hfunc, hipFuncAttribute_t attrib, int  value);
-  static hipError_t hipFuncSetCacheConfig (hipFunction_t hfunc, hipFuncCache config);
+  // static hipError_t hipFuncGetAttribute(int* pi, hipFuncAttribute_t attrib, hipFunction_t hfunc);
+  // static hipError_t hipFuncSetAttribute(hipFunction_t hfunc, hipFuncAttribute_t attrib, int  value);
+  // static hipError_t hipFuncSetCacheConfig (hipFunction_t hfunc, hipFuncCache config);
   // NVML
   static nvmlReturn_t nvmlDeviceGetHandleByPciBusId_v2( const char* pciBusId, nvmlDevice_t* device);
   static nvmlReturn_t nvmlDeviceGetClockInfo(nvmlDevice_t device, nvmlClockType_t type, unsigned int *clock);

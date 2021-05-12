@@ -125,16 +125,16 @@ void hip_stream::enqueue(driver::kernel* kernel, std::array<size_t, 3> grid, std
 
 void hip_stream::write(driver::buffer* buffer, bool blocking, std::size_t offset, std::size_t size, void const* ptr) {
   if(blocking)
-    dispatch::cuMemcpyHtoD(*buffer->cu() + offset, ptr, size);
+    dispatch::hipMemcpyHtoD(*buffer->cu() + offset, ptr, size);
   else
-    dispatch::cuMemcpyHtoDAsync(*buffer->cu() + offset, ptr, size, *cu_);
+    dispatch::hipMemcpyHtoDAsync(*buffer->cu() + offset, ptr, size, *cu_);
 }
 
 void hip_stream::read(driver::buffer* buffer, bool blocking, std::size_t offset, std::size_t size, void* ptr) {
   if(blocking)
-    dispatch::cuMemcpyDtoH(ptr, *buffer->cu() + offset, size);
+    dispatch::hipMemcpyDtoH(ptr, *buffer->cu() + offset, size);
   else
-    dispatch::cuMemcpyDtoHAsync(ptr, *buffer->cu() + offset, size, *cu_);
+    dispatch::hipMemcpyDtoHAsync(ptr, *buffer->cu() + offset, size, *cu_);
 }
 
 

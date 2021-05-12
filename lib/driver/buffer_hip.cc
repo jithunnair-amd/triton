@@ -48,7 +48,7 @@ size_t buffer::size() {
 
 uintptr_t buffer::addr_as_uintptr_t() {
   switch(backend_){
-    case CUDA: return *cu_;
+    // case CUDA: return *cu_;
     case Host: return (uintptr_t)hst_->data;
     default: return 0;
   }
@@ -75,7 +75,7 @@ host_buffer::host_buffer(size_t size)
 
 cu_buffer::cu_buffer(size_t size)
   : buffer(size, hipDeviceptr_t(), true) {
-  dispatch::cuMemAlloc(&*cu_, size);
+  dispatch::hipMalloc(&*cu_, size);
 }
 
 cu_buffer::cu_buffer(size_t size, hipDeviceptr_t cu, bool take_ownership)

@@ -71,20 +71,20 @@ host_kernel::host_kernel(driver::module* program, const char *name): kernel(prog
 
 cu_kernel::cu_kernel(driver::module *program, const char * name) : kernel(program, hipFunction_t(), true) {
   dispatch::hipModuleGetFunction(&*cu_, *program->cu(), name);
-  dispatch::hipFuncSetCacheConfig(*cu_, hipFuncCachePreferShared);
+  // dispatch::hipFuncSetCacheConfig(*cu_, hipFuncCachePreferShared);
   // properties
   int shared_total, shared_optin, shared_static;
   int n_spills, n_reg;
   hipDevice_t dev;
   dispatch::hipCtxGetDevice(&dev);
   dispatch::hipDeviceGetAttribute(&shared_total, hipDeviceAttributeMaxSharedMemoryPerMultiprocessor, dev);
-  dispatch::hipDeviceGetAttribute(&shared_optin, CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN, dev);
-  dispatch::hipFuncGetAttribute(&shared_static, hipFuncAttributeSharedSizeBytes, *cu_);
-  dispatch::hipFuncGetAttribute(&n_spills, hipFuncAttributeLocalSizeBytes,  *cu_);
-  dispatch::hipFuncGetAttribute(&n_reg, hipFuncAttributeNumRegs, *cu_);
+  // dispatch::hipDeviceGetAttribute(&shared_optin, CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN, dev);
+  // dispatch::hipFuncGetAttribute(&shared_static, hipFuncAttributeSharedSizeBytes, *cu_);
+  // dispatch::hipFuncGetAttribute(&n_spills, hipFuncAttributeLocalSizeBytes,  *cu_);
+  // dispatch::hipFuncGetAttribute(&n_reg, hipFuncAttributeNumRegs, *cu_);
   if (shared_optin > 49152){
 //      std::cout << "dynamic shared memory " << shared_optin << " " << shared_static << std::endl;
-      dispatch::cuFuncSetAttribute(*cu_, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, shared_optin - shared_static);
+      // dispatch::hipFuncSetAttribute(*cu_, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, shared_optin - shared_static);
   }
 }
 

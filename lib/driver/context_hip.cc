@@ -110,7 +110,8 @@ cu_context::cu_context(hipCtx_t context, bool take_ownership): driver::context(n
 }
 
 cu_context::cu_context(driver::device* device): context(device, hipCtx_t(), true){
-  dispatch::cuCtxCreate(&*cu_, HIP_CTX_SCHED_AUTO, *((driver::hip_device*)dev_)->cu());
+  // dispatch::hipCtxCreate(&*cu_, HIP_CTX_SCHED_AUTO, *((driver::hip_device*)dev_)->cu());
+  dispatch::hipCtxCreate(&*cu_, 0, *((driver::hip_device*)dev_)->cu());
 //  dispatch::hipCtxPopCurrent(NULL);
 }
 
