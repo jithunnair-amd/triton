@@ -115,12 +115,16 @@ class kernel:
         :param grid: The launch grid for the kernel, i.e., callable that transform compilation options into a tuple of at most 3 integers.
         :return: None
         """
+        print("args:", args)
         # make sure that the executing thread is on the right device
         torch.cuda.set_device(self.device_id)
         # pack parameters into a byte buffer
         params = struct.pack(self.tys, *args)
         print(params, grid, self.stream)
         kernel = self.fn.autotune(params, grid, self.stream)
+
+        print("kernel:", kernel)
         # run kernel
         grid = grid(kernel.opt)
+        print("grid:", grid)
         kernel(params, self.stream, grid)
