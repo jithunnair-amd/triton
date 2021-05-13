@@ -227,7 +227,7 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   short_ptr->setValue(true);
   // compute capability
   // int cc = ((driver::hip_device*)device)->compute_capability();
-  int cc = 90;
+  int cc = 70;
   std::string sm = "sm_" + std::to_string(cc);
   // driver version
   int version;
@@ -241,7 +241,7 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // PTX version
   // std::cout << "cu_module::compile_llvm_module: PTX version" << std::endl;
   // int ptx = vptx.at(version);
-  int ptx = 63;
+  int ptx = 70;
   int ptx_major = ptx / 10;
   int ptx_minor = ptx % 10;
   // create
@@ -359,7 +359,6 @@ void cu_module::init_from_ptx(const std::string& ptx) {
     std::ofstream out("ptx.hip");
     out << ptx;
     out.close();
-
     std::cerr << "It appears that Triton produced invalid PTX code:" << std::endl;
 //    exit(1);
 //#endif
