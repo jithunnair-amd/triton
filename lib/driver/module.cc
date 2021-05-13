@@ -335,10 +335,13 @@ void cu_module::init_from_ptx(const std::string& ptx) {
 //      spilled_ += std::stoi(match[1]);
 //      log = match.suffix();
 //    }
+    std::ofstream out("ptx.cu");
+    out << ptx;
+    out.close();  
   }
   catch(exception::cuda::invalid_ptx const &){
 //#ifdef TRITON_LOG_PTX_ERROR
-    std::cout << ptx << std::endl;
+    // std::cout << ptx << std::endl;
     std::cerr << "It appears that Triton produced invalid PTX code:" << std::endl;
 //    exit(1);
 //#endif
