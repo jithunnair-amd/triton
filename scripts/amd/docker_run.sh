@@ -2,8 +2,8 @@ set -o xtrace
 
 alias drun='sudo docker run -it --rm --network=host --group-add video --cap-add=SYS_PTRACE --security-opt seccomp=unconfined'
 
-DEVICES="--gpus all"
-# DEVICES="--device=/dev/kfd --device=/dev/dri"
+# DEVICES="--gpus all"
+DEVICES="--device=/dev/kfd --device=/dev/dri"
 
 MEMORY="--ipc=host --shm-size 16G"
 
@@ -12,8 +12,8 @@ VOLUMES="-v $HOME/dockerx:/dockerx -v /data:/data"
 # WORK_DIR='/root/triton'
 WORK_DIR='/dockerx/triton'
 
-# IMAGE_NAME=triton_rocm
-IMAGE_NAME=triton_cuda
+IMAGE_NAME=triton_rocm
+# IMAGE_NAME=triton_cuda
 
 # start new container
 CONTAINER_ID=$(drun -d -w $WORK_DIR $MEMORY $VOLUMES $DEVICES $IMAGE_NAME)
