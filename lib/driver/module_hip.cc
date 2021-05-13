@@ -231,21 +231,17 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   std::string sm = "sm_" + std::to_string(cc);
   // driver version
   int version;
-  // std::cout << "cu_module::compile_llvm_module: before hipDriverGetVersion" << std::endl;
   dispatch::hipDriverGetVersion(&version);
-  // std::cout << "cu_module::compile_llvm_module: after hipDriverGetVersion: " << version << std::endl;
   int major = version / 1000;
   int minor = (version - major*1000) / 10;
   if(major < 10)
     throw std::runtime_error("Triton requires CUDA 10+");
   // PTX version
-  // std::cout << "cu_module::compile_llvm_module: PTX version" << std::endl;
   // int ptx = vptx.at(version);
   int ptx = 70;
   int ptx_major = ptx / 10;
   int ptx_minor = ptx % 10;
   // create
-  // std::cout << "cu_module::compile_llvm_module: create" << std::endl;
   llvm::SmallVector<char, 0> buffer;
   std::string triple = "nvptx64-nvidia-cuda";
   std::string proc = "sm_" + std::to_string(std::min(cc, max_nvvm_cc));
@@ -253,12 +249,10 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   std::string features = "+ptx" + std::to_string(std::min(ptx, max_nvvm_ptx));
   init_llvm();
   // verify and store llvm
-  // std::cout << "cu_module::compile_llvm_module: verify and store llvm" << std::endl;
   llvm::legacy::PassManager pm;
   pm.add(llvm::createVerifierPass());
   pm.run(*module);
   // create machine
-  // std::cout << "cu_module::compile_llvm_module: create machine" << std::endl;
   module->setTargetTriple(triple);
   std::string error;
   auto target = llvm::TargetRegistry::lookupTarget(module->getTargetTriple(), error);
@@ -270,24 +264,20 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   llvm::TargetMachine *machine = target->createTargetMachine(module->getTargetTriple(), proc, features, opt,
                                                              llvm::Reloc::PIC_, llvm::None, llvm::CodeGenOpt::Aggressive);
   // set data layout
-  // std::cout << "cu_module::compile_llvm_module: set data layout" << std::endl;
   if(layout.empty())
     module->setDataLayout(machine->createDataLayout());
   else
     module->setDataLayout(layout);
   // emit machine code
-  // std::cout << "cu_module::compile_llvm_module: emit machine code" << std::endl;
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
   llvm::legacy::PassManager pass;
   llvm::raw_svector_ostream stream(buffer);
   // emit
-  // std::cout << "cu_module::compile_llvm_module: emit" << std::endl;
   machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_AssemblyFile);
   pass.run(*module);
 
   // post-process
-  // std::cout << "cu_module::compile_llvm_module: post-process" << std::endl;
   std::string result(buffer.begin(), buffer.end());
   find_and_replace(result, ".version", "\n", ".version " + std::to_string(ptx_major) + "." + std::to_string(ptx_minor) + "\n");
   find_and_replace(result, ".target", "\n", ".target " + sm + "\n");
@@ -333,6 +323,9 @@ void cu_module::init_from_ptx(const std::string& ptx) {
 //      log = match.suffix();
 //    }
 //    std::cout << log << std::endl;
+    std::ofstream input("ptx_input.hip");
+    input << ptx;
+    input.close();
 
     hipJitOption opt[] = {hipJitOptionErrorLogBufferSizeBytes, hipJitOptionErrorLogBuffer,
                           hipJitOptionInfoLogBufferSizeBytes, hipJitOptionInfoLogBuffer,
