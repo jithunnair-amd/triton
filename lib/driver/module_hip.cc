@@ -220,11 +220,11 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // LLVM version in use may not officially support target hardware
   int max_nvvm_cc = 75;
   int max_nvvm_ptx = 64;
-  // options
-  auto options = llvm::cl::getRegisteredOptions();
-  auto* short_ptr = static_cast<llvm::cl::opt<bool>*>(options["nvptx-short-ptr"]);
-  assert(short_ptr);
-  short_ptr->setValue(true);
+  // options (causes segfault when enabled)
+  // auto options = llvm::cl::getRegisteredOptions();
+  // auto* short_ptr = static_cast<llvm::cl::opt<bool>*>(options["nvptx-short-ptr"]);
+  // assert(short_ptr);
+  // short_ptr->setValue(true);
   // compute capability
   // int cc = ((driver::hip_device*)device)->compute_capability();
   int cc = 70;
@@ -243,31 +243,56 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   int ptx_minor = ptx % 10;
   // create
   llvm::SmallVector<char, 0> buffer;
+#if 0
   std::string triple = "nvptx64-nvidia-cuda";
   std::string proc = "sm_" + std::to_string(std::min(cc, max_nvvm_cc));
   std::string layout = "";
   std::string features = "+ptx" + std::to_string(std::min(ptx, max_nvvm_ptx));
+#else
+  // std::string triple = "rocm-amdhsa";
+  // std::string triple = "amdgcn--amdhsa";
+  // std::string triple ="amdgcn-amd-amdhsa-amdgizcl";
+  std::string triple ="amdgcn--amdhsa-amdgiz";
+  // std::string triple = "amdgcn-amd-amdhsa";
+  std::string proc = "gfx902";
+  std::string layout = "";
+  // std::string features = "code-object-v3";
+  std::string features = "-code-object-v3";
+  // std::string features="-ptx60";
+#endif
   init_llvm();
   // verify and store llvm
   llvm::legacy::PassManager pm;
+  // pm.add(llvm::createPrintModulePass(llvm::outs()));
   pm.add(llvm::createVerifierPass());
   pm.run(*module);
   // create machine
+  std::cout << "cu_module::compile_llvm_module: before setTargetTriple" << std::endl;
+  // return "";
   module->setTargetTriple(triple);
+  std::cout << "cu_module::compile_llvm_module: after setTargetTriple" << std::endl;
   std::string error;
   auto target = llvm::TargetRegistry::lookupTarget(module->getTargetTriple(), error);
+  std::cout << error << std::endl;
   llvm::TargetOptions opt;
   opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
   opt.UnsafeFPMath = false;
   opt.NoInfsFPMath = false;
   opt.NoNaNsFPMath = true;
+  std::cout << "cu_module::compile_llvm_module: before createTargetMachine" << std::endl;
   llvm::TargetMachine *machine = target->createTargetMachine(module->getTargetTriple(), proc, features, opt,
                                                              llvm::Reloc::PIC_, llvm::None, llvm::CodeGenOpt::Aggressive);
+  std::cout << "cu_module::compile_llvm_module: after createTargetMachine" << std::endl; 
   // set data layout
   if(layout.empty())
+  {
     module->setDataLayout(machine->createDataLayout());
+  }
   else
+  {
     module->setDataLayout(layout);
+  }
+  return "";
   // emit machine code
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
@@ -323,9 +348,11 @@ void cu_module::init_from_ptx(const std::string& ptx) {
 //      log = match.suffix();
 //    }
 //    std::cout << log << std::endl;
-    std::ofstream input("ptx_input.hip");
-    input << ptx;
-    input.close();
+    std::ifstream t("ptx.cu");
+    std::string ptx_cu((std::istreambuf_iterator<char>(t)),
+                 std::istreambuf_iterator<char>());
+
+    // ptx_ = ptx_cu;
 
     hipJitOption opt[] = {hipJitOptionErrorLogBufferSizeBytes, hipJitOptionErrorLogBuffer,
                           hipJitOptionInfoLogBufferSizeBytes, hipJitOptionInfoLogBuffer,
