@@ -46,6 +46,7 @@
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 
 std::string exec(const char* cmd) {
     std::array<char, 128> buffer;
@@ -263,12 +264,10 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   init_llvm();
   // verify and store llvm
   llvm::legacy::PassManager pm;
-  // pm.add(llvm::createPrintModulePass(llvm::outs()));
   pm.add(llvm::createVerifierPass());
   pm.run(*module);
   // create machine
   std::cout << "cu_module::compile_llvm_module: before setTargetTriple" << std::endl;
-  // return "";
   module->setTargetTriple(triple);
   std::cout << "cu_module::compile_llvm_module: after setTargetTriple" << std::endl;
   std::string error;
@@ -285,22 +284,21 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   std::cout << "cu_module::compile_llvm_module: after createTargetMachine" << std::endl; 
   // set data layout
   if(layout.empty())
-  {
     module->setDataLayout(machine->createDataLayout());
-  }
   else
-  {
     module->setDataLayout(layout);
-  }
-  return "";
   // emit machine code
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
   llvm::legacy::PassManager pass;
   llvm::raw_svector_ostream stream(buffer);
   // emit
-  machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_AssemblyFile);
+  llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
+  pass.add(p);
+  machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_ObjectFile);
+  
   pass.run(*module);
+  return "";
 
   // post-process
   std::string result(buffer.begin(), buffer.end());
