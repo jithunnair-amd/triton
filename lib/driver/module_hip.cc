@@ -292,13 +292,22 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
     f.addFnAttr(llvm::Attribute::AlwaysInline);
   llvm::legacy::PassManager pass;
   llvm::raw_svector_ostream stream(buffer);
+  std::error_code ec;
+  std::string module_name=module->getModuleIdentifier();
+  std::string isabin_path = module_name.append(std::string(".o"));
+  std::unique_ptr<llvm::raw_fd_ostream> isabin_fs(
+      new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::F_Text));
+
+  std::cout << ec << std::endl;
+
   // emit
   llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
   pass.add(p);
-  machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_ObjectFile);
+  machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CodeGenFileType::CGFT_ObjectFile);
+  
+  return "";
   
   pass.run(*module);
-  return "";
 
   // post-process
   std::string result(buffer.begin(), buffer.end());
