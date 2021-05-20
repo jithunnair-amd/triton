@@ -219,8 +219,8 @@ static std::map<int, int> vptx = {
 std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module, driver::device* device) {
   std::cout << "cu_module::compile_llvm_module" << std::endl;
   // LLVM version in use may not officially support target hardware
-  int max_nvvm_cc = 75;
-  int max_nvvm_ptx = 64;
+  // int max_nvvm_cc = 75;
+  // int max_nvvm_ptx = 64;
   // options (causes segfault when enabled)
   // auto options = llvm::cl::getRegisteredOptions();
   // auto* short_ptr = static_cast<llvm::cl::opt<bool>*>(options["nvptx-short-ptr"]);
@@ -253,12 +253,13 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // std::string triple = "rocm-amdhsa";
   // std::string triple = "amdgcn--amdhsa";
   // std::string triple ="amdgcn-amd-amdhsa-amdgizcl";
-  std::string triple ="amdgcn--amdhsa-amdgiz";
-  // std::string triple = "amdgcn-amd-amdhsa";
-  std::string proc = "gfx902";
+  // std::string triple ="amdgcn--amdhsa-amdgiz";
+  std::string triple = "amdgcn-amd-amdhsa";
+  std::string proc = "gfx908"; //TODO: QUERY GPU to make sure it works
   std::string layout = "";
   // std::string features = "code-object-v3";
-  std::string features = "-code-object-v3";
+  // std::string features = "-code-object-v3";
+  std::string features = ""; //TODO grep for sram
   // std::string features="-ptx60";
 #endif
   init_llvm();
@@ -290,11 +291,14 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // emit machine code
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
-  llvm::legacy::PassManager pass;
+
+  std::string module_name=module->getModuleIdentifier();
+  std::string dummy_path = module_name.append(std::string("-amdgpu.dummy"));
+  std::string isabin_path = module_name.append(std::string(".o"));
+
+  llvm::legacy::PassManager pass();
   llvm::raw_svector_ostream stream(buffer);
   std::error_code ec;
-  std::string module_name=module->getModuleIdentifier();
-  std::string isabin_path = module_name.append(std::string(".o"));
   std::unique_ptr<llvm::raw_fd_ostream> isabin_fs(
       new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::F_Text));
 
@@ -305,9 +309,9 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   pass.add(p);
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CodeGenFileType::CGFT_ObjectFile);
   
-  return "";
   
   pass.run(*module);
+  return "";
 
   // post-process
   std::string result(buffer.begin(), buffer.end());
