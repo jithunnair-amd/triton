@@ -255,10 +255,11 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // std::string triple ="amdgcn-amd-amdhsa-amdgizcl";
   // std::string triple ="amdgcn--amdhsa-amdgiz";
   std::string triple = "amdgcn-amd-amdhsa";
-  std::string proc = "gfx908"; //TODO: QUERY GPU to make sure it works
+  std::string proc = "gfx908"; //TODO: add code to QUERY GPU to make sure it works
   std::string layout = "";
   // std::string features = "code-object-v3";
   // std::string features = "-code-object-v3";
+  // std::string features = "+sramecc"; //TODO grep for sram
   std::string features = ""; //TODO grep for sram
   // std::string features="-ptx60";
 #endif
@@ -293,10 +294,9 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
     f.addFnAttr(llvm::Attribute::AlwaysInline);
 
   std::string module_name=module->getModuleIdentifier();
-  std::string dummy_path = module_name.append(std::string("-amdgpu.dummy"));
   std::string isabin_path = module_name.append(std::string(".o"));
 
-  llvm::legacy::PassManager pass();
+  llvm::legacy::PassManager pass;
   llvm::raw_svector_ostream stream(buffer);
   std::error_code ec;
   std::unique_ptr<llvm::raw_fd_ostream> isabin_fs(
@@ -309,9 +309,8 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   pass.add(p);
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CodeGenFileType::CGFT_ObjectFile);
   
-  
-  pass.run(*module);
   return "";
+  pass.run(*module);
 
   // post-process
   std::string result(buffer.begin(), buffer.end());

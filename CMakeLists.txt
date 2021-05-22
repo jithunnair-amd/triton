@@ -8,7 +8,7 @@ set(USE_ROCM TRUE)
 # include(third_party/hipify-torch/cmake/Hipify.cmake)
 # endif()
 
-# set(CMAKE_VERBOSE_MAKEFILE on)
+# set(CMAKE_VERBOSE_MAKEFILE ON)
 
 
 if(NOT TRITON_LLVM_BUILD_DIR)
@@ -69,6 +69,7 @@ set(LLVM_INCLUDE_TOOLS "OFF" CACHE INTERNAL "")
 set(LLVM_INCLUDE_UTILS "OFF" CACHE INTERNAL "")
 add_subdirectory(${TRITON_LLVM_BUILD_DIR}/llvm-src
                  ${TRITON_LLVM_BUILD_DIR}/llvm-build)
+set(LLVM_ENABLE_PROJECTS "lld" CACHE INTERNAL "")
 get_property(LLVM_LIBRARIES GLOBAL PROPERTY LLVM_COMPONENT_LIBS)
 # remove LLVM-specific variables so we don't pollute GUI
 get_cmake_property(_variableNames VARIABLES)
@@ -93,14 +94,12 @@ if(BUILD_PYTHON_MODULE)
     else()
         set(CUTLASS_SRC ${PYTHON_SRC_PATH}/cutlass.cc)
     endif()
-  
         add_definitions(-DWITH_CUTLASS_BINDINGS)
         set(CUTLASS_LIBRARIES "cutlass.a")
     endif()
     message(STATUS ${CUTLASS_INCLUDE_PATH})
     include_directories("." ${PYTHON_SRC_PATH} ${PYTHON_INCLUDE_DIRS} ${CUTLASS_INCLUDE_DIR})
     link_directories(${PYTHON_LINK_DIRS} ${CUTLASS_LIBRARY_DIR})
-    
     if (USE_ROCM)
         set(PYTHON_SRC ${PYTHON_SRC_PATH}/main.cc ${PYTHON_SRC_PATH}/triton_hip.cc  ${PYTHON_SRC_PATH}/superblock_hip.cc ${CUTLASS_SRC})
     else()
@@ -138,7 +137,6 @@ else ()
         endif()
     endforeach()
 endif()
-
 
 add_library(triton SHARED ${LIBTRITON_SRC} ${PYTHON_SRC})
 target_link_libraries(triton ${LLVM_LIBRARIES})
