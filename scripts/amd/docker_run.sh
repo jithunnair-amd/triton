@@ -12,8 +12,9 @@ VOLUMES="-v $HOME/dockerx:/dockerx -v /data:/data"
 # WORK_DIR='/root/triton'
 WORK_DIR='/dockerx/triton'
 
-IMAGE_NAME=triton_rocm
+# IMAGE_NAME=triton_rocm
 # IMAGE_NAME=triton_cuda
+IMAGE_NAME=rocm/pytorch:rocm4.2_ubuntu18.04_py3.6_pytorch
 
 # start new container
 CONTAINER_ID=$(drun -d -w $WORK_DIR $MEMORY $VOLUMES $DEVICES $IMAGE_NAME)
