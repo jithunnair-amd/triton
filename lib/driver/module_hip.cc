@@ -24,6 +24,8 @@
 #include <unistd.h>
 #include <memory>
 #include <regex>
+#include <iostream>
+#include <sstream>
 #include "triton/driver/module_hip.h"
 #include "triton/driver/context_hip.h"
 #include "triton/driver/error_hip.h"
@@ -216,6 +218,38 @@ static std::map<int, int> vptx = {
   {11020, 72}
 };
 
+template <typename T>
+std::string str_join(const T &v, const std::string &delim)
+{
+  std::ostringstream s;
+  for (const auto &i : v)
+  {
+    if (&i != &v[0])
+    {
+      s << delim;
+    }
+    s << i;
+  }
+  return s.str();
+}
+
+std::vector<std::string> str_split(const std::string &str, const std::string &delim)
+{
+  std::vector<std::string> tokens;
+  size_t prev = 0, pos = 0;
+  do
+  {
+    pos = str.find(delim, prev);
+    if (pos == std::string::npos)
+      pos = str.length();
+    std::string token = str.substr(prev, pos - prev);
+    if (!token.empty())
+      tokens.push_back(token);
+    prev = pos + delim.length();
+  } while (pos < str.length() && prev < str.length());
+  return tokens;
+}
+
 #define TF_ROCM_VERSION 42000
 std::string MapGCNArchNameTokenToFeatureStr(const std::string& token) {
   if (token == "sramecc+") {
@@ -249,7 +283,8 @@ std::pair<std::string, std::string> GetFeatureStrFromGCNArchName(
 #else
   // For ROCm versions 4.0 and greater, we need to specify the correct
   // feature str, based on the underlying GPU HW to get max performance.
-  std::vector<std::string> tokens = absl::StrSplit(gcn_arch_name, ':');
+  // std::vector<std::string> tokens = absl::StrSplit(gcn_arch_name, ':');
+  std::vector<std::string> tokens = str_split(gcn_arch_name, ":");
   std::vector<std::string> mapped_tokens;
   if(tokens.size()>0)
     gfx=tokens[0];
@@ -262,7 +297,9 @@ std::pair<std::string, std::string> GetFeatureStrFromGCNArchName(
       mapped_tokens.push_back(mapped_token);
     }
   }
-  feature_str = absl::StrJoin(mapped_tokens, ",");
+  // feature_str = absl::StrJoin(mapped_tokens, ",");
+  feature_str = str_join(mapped_tokens, ",");
+  std::cout << "feature_str: " << feature_str << std::endl;
 #endif
 
   return make_pair(gfx, feature_str);
@@ -314,7 +351,7 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // std::string features = "+sramecc"; //TODO grep for sram
   // std::string features = ""; //TODO grep for sram
   // std::string features="-ptx60";
-  std::string features = GetFeatureStrFromGCNArchName(proc)[1];
+  std::string features = std::get<1>(GetFeatureStrFromGCNArchName("gfx908:sramecc+:xnack-"));
 #endif
   init_llvm();
   // verify and store llvm
