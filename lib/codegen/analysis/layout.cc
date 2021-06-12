@@ -138,9 +138,10 @@ mma_layout::mma_layout(size_t num_warps,
                        const std::vector<ir::value *> &values,
                        analysis::align* align, target* tgt,
                        shared_layout *layout_a, shared_layout *layout_b): data_layout(MMA, axes, shape, values, align) {
+  std::cout << "mma_layout::mma_layout" << std::endl;
   /* fragments per warp */
   // try to make things as square as possible to maximize data re-use
-  if(tgt->as_nvidia()->sm() < 80){
+  if(false){
     fpw_ = {2, 2, 1};
 //    std::vector<int> fpw_nm1;
 //    unsigned num_fragments = std::min<unsigned>((shape_[0]/8)*(shape_[1]/8), 4);

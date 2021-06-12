@@ -15,3 +15,7 @@ def test_op():
     rtol, atol = {torch.float32: (1e-4, 1e-5),
                   torch.float16: (1e-2, 1e-3)}[DTYPE]
     assert torch.allclose(tt_c, th_c, atol=atol, rtol=rtol)
+
+if __name__ == "__main__":
+    # execute only if run as a script
+    test_op()

@@ -124,16 +124,14 @@ std::tuple<std::shared_ptr<driver::module>,
            size_t> kernel::ir_to_bin(ir::module &ir, driver::device* dev, const options_t& opt) {
   std::cout << "function_hip::kernel::driver" << std::endl;
   // generate llvm code
-  // std::cout << "function_hip::kernel::driver: generate llvm code" << std::endl;
   llvm::LLVMContext ctx;
   std::string name = ir.get_function_list()[0]->get_name();
   std::unique_ptr<llvm::Module> llvm(new llvm::Module(name, ctx));
   // optimizations
-  // std::cout << "function_hip::kernel::driver: optimizations" << std::endl;
   std::unique_ptr<codegen::target> target = dev->make_target();
-  bool cts_use_async = target->as_nvidia()->sm() >= 80;
+  // bool cts_use_async = target->as_nvidia()->sm() >= 80;
+  bool cts_use_async = false;
   // create passes
-  // std::cout << "function_hip::kernel::driver: create passes" << std::endl;
   codegen::analysis::align align;
   codegen::analysis::axes axes;
   codegen::transform::cts cts(cts_use_async);
@@ -150,7 +148,6 @@ std::tuple<std::shared_ptr<driver::module>,
   codegen::transform::coalesce coalesce(&align, &layouts);
   codegen::generator isel(&axes, &layouts, &align, &allocation, &swizzle, target.get(), opt.num_warps);
   // run passes
-  // std::cout << "function_hip::kernel::driver: run passes" << std::endl;
   dce.run(ir);
   peephole.run(ir);
   dce.run(ir);
@@ -163,9 +160,13 @@ std::tuple<std::shared_ptr<driver::module>,
   layouts.run(ir);
   peephole.run(ir);
   dce.run(ir);
-//  ir::print(ir, std::cout);
-  if(target->is_gpu())
-    cts.run(ir);
+  std::ofstream ir_out("conv_after_passes.ir");
+  ir::print(ir, ir_out);
+  // if(target->is_gpu())
+  // {
+  //   std::cout << "function_hip::kernel::driver: gpu check 1" << std::endl;
+  //   cts.run(ir);
+  // }
   align.run(ir);
   axes.run(ir);
   layouts.run(ir);
@@ -173,10 +174,11 @@ std::tuple<std::shared_ptr<driver::module>,
   dce.run(ir);
   align.run(ir);
   dce.run(ir);
-  if(target->is_gpu()){
-    reassociate.run(ir);
-    cts.run(ir);
-  }
+  // if(target->is_gpu()){
+  //   std::cout << "function_hip::kernel::driver: gpu check 2" << std::endl;
+  //   reassociate.run(ir);
+  //   cts.run(ir);
+  // }
   dce.run(ir);
   align.run(ir);
   axes.run(ir);
@@ -190,7 +192,12 @@ std::tuple<std::shared_ptr<driver::module>,
   liveness.run(ir);
   allocation.run(ir);
   barriers.run(ir);
+  std::ofstream ir_out_2("conv_before_visit.ir");
+  ir::print(ir, ir_out_2);
   isel.visit(ir, *llvm);
+  std::ofstream ir_out_3("conv_after_visit.ir");
+  ir::print(ir, ir_out_3);
+  // llvm src call
   std::shared_ptr<driver::module> mod(driver::module::create(dev, std::move(llvm)));
   std::shared_ptr<driver::kernel> ker(driver::kernel::create(&*mod, name.c_str()));
   size_t shared_mem = allocation.allocated_size();

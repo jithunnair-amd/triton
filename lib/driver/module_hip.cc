@@ -117,6 +117,7 @@ void module::compile_llvm_module(std::unique_ptr<llvm::Module> module, const std
 /* ------------------------ */
 
 host_module::host_module(std::unique_ptr<llvm::Module> src): module(host_module_t(), true) {
+  std::cout << "host_module::host_module" << std::endl;
   init_llvm();
   // create kernel wrapper
   llvm::LLVMContext &ctx = src->getContext();
@@ -307,17 +308,30 @@ std::pair<std::string, std::string> GetFeatureStrFromGCNArchName(
 
 std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module, driver::device* device) {
   std::cout << "cu_module::compile_llvm_module" << std::endl;
+#if 0
   // LLVM version in use may not officially support target hardware
-  // int max_nvvm_cc = 75;
-  // int max_nvvm_ptx = 64;
-  // options (causes segfault when enabled)
-  // auto options = llvm::cl::getRegisteredOptions();
-  // auto* short_ptr = static_cast<llvm::cl::opt<bool>*>(options["nvptx-short-ptr"]);
-  // assert(short_ptr);
-  // short_ptr->setValue(true);
+  int max_nvvm_cc = 75;
+  int max_nvvm_ptx = 64;
+#endif
+  // options
+  auto options = llvm::cl::getRegisteredOptions();
+#if 0
+  auto* short_ptr = static_cast<llvm::cl::opt<bool>*>(options["nvptx-short-ptr"]);
+  assert(short_ptr);
+  short_ptr->setValue(true);
+#else
+  // for (auto key:options.keys())
+  // {
+  //   std::cout << key.str() << std::endl;
+  // }
+  // auto* opt = static_cast<llvm::cl::opt<bool>*>(options[""]);
+  // assert(opt);
+  // opt->setValue(true);
+#endif
+
+#if 0
   // compute capability
-  // int cc = ((driver::hip_device*)device)->compute_capability();
-  int cc = 70;
+  int cc = ((driver::hip_device*)device)->compute_capability();
   std::string sm = "sm_" + std::to_string(cc);
   // driver version
   int version;
@@ -327,10 +341,10 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   if(major < 10)
     throw std::runtime_error("Triton requires CUDA 10+");
   // PTX version
-  // int ptx = vptx.at(version);
-  int ptx = 70;
+  int ptx = vptx.at(version);
   int ptx_major = ptx / 10;
   int ptx_minor = ptx % 10;
+#endif
   // create
   llvm::SmallVector<char, 0> buffer;
 #if 0
@@ -339,19 +353,12 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   std::string layout = "";
   std::string features = "+ptx" + std::to_string(std::min(ptx, max_nvvm_ptx));
 #else
-  // std::string triple = "rocm-amdhsa";
-  // std::string triple = "amdgcn--amdhsa";
-  // std::string triple ="amdgcn-amd-amdhsa-amdgizcl";
   // std::string triple ="amdgcn--amdhsa-amdgiz";
   std::string triple = "amdgcn-amd-amdhsa";
   std::string proc = "gfx908"; //TODO: add code to QUERY GPU to make sure it works
   std::string layout = "";
-  // std::string features = "code-object-v3";
-  // std::string features = "-code-object-v3";
-  // std::string features = "+sramecc"; //TODO grep for sram
-  // std::string features = ""; //TODO grep for sram
-  // std::string features="-ptx60";
-  std::string features = std::get<1>(GetFeatureStrFromGCNArchName("gfx908:sramecc+:xnack-"));
+  // std::string features = std::get<1>(GetFeatureStrFromGCNArchName("gfx908:sramecc+:xnack-"));
+  std::string features = "+sramecc,-xnack";
 #endif
   init_llvm();
   // verify and store llvm
@@ -359,21 +366,17 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   pm.add(llvm::createVerifierPass());
   pm.run(*module);
   // create machine
-  std::cout << "cu_module::compile_llvm_module: before setTargetTriple" << std::endl;
   module->setTargetTriple(triple);
-  std::cout << "cu_module::compile_llvm_module: after setTargetTriple" << std::endl;
   std::string error;
   auto target = llvm::TargetRegistry::lookupTarget(module->getTargetTriple(), error);
-  std::cout << error << std::endl;
+  std::cout <<"lookupTarget error: "<< error << std::endl;
   llvm::TargetOptions opt;
   opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
   opt.UnsafeFPMath = false;
   opt.NoInfsFPMath = false;
   opt.NoNaNsFPMath = true;
-  std::cout << "cu_module::compile_llvm_module: before createTargetMachine" << std::endl;
   llvm::TargetMachine *machine = target->createTargetMachine(module->getTargetTriple(), proc, features, opt,
                                                              llvm::Reloc::PIC_, llvm::None, llvm::CodeGenOpt::Aggressive);
-  std::cout << "cu_module::compile_llvm_module: after createTargetMachine" << std::endl; 
   // set data layout
   if(layout.empty())
     module->setDataLayout(machine->createDataLayout());
@@ -382,31 +385,42 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   // emit machine code
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
-
-  std::string module_name=module->getModuleIdentifier();
-  std::string isabin_path = module_name.append(std::string(".o"));
-
   llvm::legacy::PassManager pass;
-  llvm::raw_svector_ostream stream(buffer);
+  llvm::raw_svector_ostream pstream(buffer);
+
+  // create dump files
+  std::string module_name = module->getModuleIdentifier();
+  std::string ir_path = module_name + std::string(".ir");
+  std::string isabin_path = module_name + std::string(".o");
   std::error_code ec;
+
+  // Dump LLVM IR.
+  std::unique_ptr<llvm::raw_fd_ostream> ir_fs(
+      new llvm::raw_fd_ostream(ir_path, ec, llvm::sys::fs::OF_None));
+  module->print(*ir_fs, nullptr);
+  ir_fs->flush();
+
+  // Emit GCN ISA binary.
   std::unique_ptr<llvm::raw_fd_ostream> isabin_fs(
-      new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::F_Text));
+      new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::OF_Text));
+  std::cout << "isabin_fs error code: " << ec << std::endl;
 
-  std::cout << ec << std::endl;
-
-  // emit
   // llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
   // pass.add(p);
-  machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CodeGenFileType::CGFT_ObjectFile);
-  return "";
+
+  // emit
+  machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CGFT_ObjectFile);
   pass.run(*module);
+  isabin_fs->flush();
 
   // post-process
   std::string result(buffer.begin(), buffer.end());
+#if 0
   find_and_replace(result, ".version", "\n", ".version " + std::to_string(ptx_major) + "." + std::to_string(ptx_minor) + "\n");
   find_and_replace(result, ".target", "\n", ".target " + sm + "\n");
   while(find_and_replace(result, "\t// begin inline asm", "\n", ""));
   while(find_and_replace(result, "\t// end inline asm", "\n", ""));
+#endif
   return result;
 }
 
@@ -447,9 +461,9 @@ void cu_module::init_from_ptx(const std::string& ptx) {
 //      log = match.suffix();
 //    }
 //    std::cout << log << std::endl;
-    std::ifstream t("ptx.cu");
-    std::string ptx_cu((std::istreambuf_iterator<char>(t)),
-                 std::istreambuf_iterator<char>());
+    // std::ifstream t("ptx.cu");
+    // std::string ptx_cu((std::istreambuf_iterator<char>(t)),
+    //              std::istreambuf_iterator<char>());
 
     // ptx_ = ptx_cu;
 
