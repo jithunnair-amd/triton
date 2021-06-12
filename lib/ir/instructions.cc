@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iostream>
 #include "triton/ir/context.h"
 #include "triton/ir/basic_block.h"
 #include "triton/ir/instructions.h"
@@ -30,9 +31,9 @@ void instruction::erase_from_parent() {
 }
 
 bool instruction::has_tile_result_or_op() {
-  bool result = get_type()->is_tile_ty();
+  bool result = get_type()->is_block_ty();
   for(unsigned i = 0; i < get_num_operands(); i++)
-    result |= get_operand(i)->get_type()->is_tile_ty();
+    result |= get_operand(i)->get_type()->is_block_ty();
   return result;
 }
 
@@ -209,8 +210,8 @@ cmp_inst::cmp_inst(type *ty, value_id_t id, cmp_pred_t pred, value *lhs, value *
 
 type* cmp_inst::make_cmp_result_type(type *ty){
   type* int1_ty = type::get_int1_ty(ty->get_context());
-  if (tile_type* tile_ty = dynamic_cast<tile_type*>(ty))
-    return tile_type::get_same_shapes(int1_ty, tile_ty);
+  if (block_type* tile_ty = dynamic_cast<block_type*>(ty))
+    return block_type::get_same_shapes(int1_ty, tile_ty);
   return int1_ty;
 }
 
@@ -279,7 +280,7 @@ std::string cast_inst::repr_impl() const {
 }
 // TODO
 bool cast_inst::is_valid(cast_op_t op, value *arg, type *ty) {
-  assert(arg->get_type()->is_tile_ty() == ty->is_tile_ty());
+  assert(arg->get_type()->is_block_ty() == ty->is_block_ty());
   return true;
 }
 
@@ -383,11 +384,11 @@ type *getelementptr_inst::get_return_type(type *elt_ty, value *x, const std::vec
   unsigned addr_space = ty->get_scalar_ty()->get_pointer_address_space();
   type *ptr_ty = pointer_type::get(get_indexed_type(elt_ty, idx_list), addr_space);
   // Tile GEP
-  if(ty->is_tile_ty())
-    return tile_type::get_same_shapes(ptr_ty, ty);
+  if(ty->is_block_ty())
+    return block_type::get_same_shapes(ptr_ty, ty);
   for(value *idx : idx_list)
-  if (idx->get_type()->is_tile_ty())
-    return tile_type::get_same_shapes(ptr_ty, ty);
+  if (idx->get_type()->is_block_ty())
+    return block_type::get_same_shapes(ptr_ty, ty);
   // Scalar GEP
   return ptr_ty;
 }
@@ -440,8 +441,8 @@ load_inst::load_inst(value *ptr, value_id_t id, unsigned num_ops, const std::str
 type *load_inst::get_pointee_type(type *ty) {
   type *scalar_ty = ty->get_scalar_ty();
   type *pointee_ty = scalar_ty->get_pointer_element_ty();
-  if(ty->is_tile_ty())
-    return tile_type::get_same_shapes(pointee_ty, ty);
+  if(ty->is_block_ty())
+    return block_type::get_same_shapes(pointee_ty, ty);
   return pointee_ty;
 }
 
@@ -483,19 +484,6 @@ masked_load_async_inst* masked_load_async_inst::create(value *ptr, value *mask, 
   return new masked_load_async_inst(ptr, mask, false_value, name, next);
 }
 
-// atomic add
-
-atomic_add_inst::atomic_add_inst(value *ptr, value *val, value *msk, const std::string &name, instruction *next)
-  : io_inst(ptr->get_type()->get_pointer_element_ty(), INST_ATOMIC_ADD, 3, name, next) {
-  set_operand(0, ptr);
-  set_operand(1, val);
-  set_operand(2, msk);
-}
-
-instruction* atomic_add_inst::create(value *ptr, value *val, value *msk, const std::string &name, instruction *next) {
-  return new atomic_add_inst(ptr, val, msk, name, next);
-}
-
 // store
 
 store_inst::store_inst(value *ptr, value_id_t id, unsigned num_ops, const std::string &name, instruction *next)
@@ -531,14 +519,14 @@ masked_store_inst* masked_store_inst::create(value *ptr, value *val, value *mask
 //                               retile_inst classes
 //===----------------------------------------------------------------------===//
 
-retile_inst::retile_inst(value *arg, value_id_t id, const type::tile_shapes_t &shapes,
+retile_inst::retile_inst(value *arg, value_id_t id, const type::block_shapes_t &shapes,
                          const std::string &name, instruction *next)
-   : unary_inst(tile_type::get(arg->get_type()->get_scalar_ty(), shapes), id, arg, name, next) { }
+   : unary_inst(block_type::get(arg->get_type()->get_scalar_ty(), shapes), id, arg, name, next) { }
 
 
 // reshape
 
-instruction* reshape_inst::create(value *arg, const type::tile_shapes_t &shapes,
+instruction* reshape_inst::create(value *arg, const type::block_shapes_t &shapes,
                                   const std::string &name, instruction *next) {
   return new reshape_inst(arg, INST_RESHAPE, shapes, name, next);
 }
@@ -546,14 +534,14 @@ instruction* reshape_inst::create(value *arg, const type::tile_shapes_t &shapes,
 
 // splat
 
-instruction* splat_inst::create(value *arg, const type::tile_shapes_t &shapes,
+instruction* splat_inst::create(value *arg, const type::block_shapes_t &shapes,
                                   const std::string &name, instruction *next) {
   return new splat_inst(arg, INST_SPLAT, shapes, name, next);
 }
 
 // broadcast
 
-instruction* broadcast_inst::create(value *arg, const type::tile_shapes_t &shapes,
+instruction* broadcast_inst::create(value *arg, const type::block_shapes_t &shapes,
                                   const std::string &name, instruction *next) {
   return new broadcast_inst(arg, INST_BROADCAST, shapes, name, next);
 }
@@ -610,20 +598,20 @@ instruction *dot_inst::create_tt(value *A, value *B, value *C,
 
 ir::type* trans_inst::get_res_ty(ir::type* ty, std::vector<int> perm) {
   // get argument shapes
-  ir::tile_type::tile_shapes_t arg_shapes = ty->get_tile_shapes();
+  ir::block_type::block_shapes_t arg_shapes = ty->get_block_shapes();
   // permutate argument shapes
   perm = init_perm(ty, perm);
-  ir::tile_type::tile_shapes_t res_shapes = arg_shapes;
+  ir::block_type::block_shapes_t res_shapes = arg_shapes;
   for(size_t i = 0; i < perm.size(); i++)
     res_shapes[i] = arg_shapes[perm[i]];
   // construct type
-  return tile_type::get(ty->get_scalar_ty(), res_shapes);
+  return block_type::get(ty->get_scalar_ty(), res_shapes);
 }
 
 std::vector<int> trans_inst::init_perm(ir::type* ty, const std::vector<int>& perm) {
   if(!perm.empty())
     return perm;
-  auto size = ty->get_tile_shapes().size();
+  auto size = ty->get_block_shapes().size();
   std::vector<int> result;
   result.push_back(size - 1);
   for(size_t i = 0; i < size - 1; i++)
@@ -682,13 +670,13 @@ std::string reduce_inst::to_str(op_t op) {
 }
 
 type* reduce_inst::get_res_type(value *arg, unsigned axis) {
-  ir::tile_type::tile_shapes_t shapes = arg->get_type()->get_tile_shapes();
+  ir::block_type::block_shapes_t shapes = arg->get_type()->get_block_shapes();
   shapes.erase(shapes.begin() + axis);
   type *scalar_ty = arg->get_type()->get_scalar_ty();
   if(shapes.empty())
 //    shapes.push_back(1);
     return scalar_ty;
-  return tile_type::get(scalar_ty, shapes);
+  return block_type::get(scalar_ty, shapes);
 }
 
 reduce_inst::reduce_inst(value *arg, op_t op, unsigned axis, const std::string &name, instruction *next)
@@ -733,20 +721,33 @@ instruction* get_program_id_inst::create(context &ctx, unsigned axis, const std:
 }
 
 // get_num_program
-get_num_program_inst::get_num_program_inst(type *ty, unsigned axis, const std::string &name, instruction *next)
+get_num_programs_inst::get_num_programs_inst(type *ty, unsigned axis, const std::string &name, instruction *next)
   : builtin_inst(ty, INST_GET_NUM_PROGRAMS, 0, name, next), axis_(axis){
 
 }
 
-instruction* get_num_program_inst::create(context &ctx, unsigned axis, const std::string &name, instruction *next) {
-  return new get_num_program_inst(type::get_int32_ty(ctx), axis, name, next);
+instruction* get_num_programs_inst::create(context &ctx, unsigned axis, const std::string &name, instruction *next) {
+  return new get_num_programs_inst(type::get_int32_ty(ctx), axis, name, next);
+}
+
+// atomic_rmw
+
+atomic_rmw_inst::atomic_rmw_inst(atomic_rmw_op_t op, value *ptr, value *val, value *msk, const std::string &name, instruction *next)
+  : atomic_inst(ptr->get_type()->get_pointer_element_ty(), INST_ATOMIC_RMW, 3, name, next), op_(op) {
+  set_operand(0, ptr);
+  set_operand(1, val);
+  set_operand(2, msk);
+}
+
+instruction* atomic_rmw_inst::create(atomic_rmw_op_t op, value *ptr, value *val, value *msk, const std::string &name, instruction *next) {
+  return new atomic_rmw_inst(op, ptr, val, msk, name, next);
 }
 
 
 // atomic cas
 
 atomic_cas_inst::atomic_cas_inst(value *ptr, value *cmp, value *val, const std::string &name, instruction *next)
-  : builtin_inst(ptr->get_type()->get_pointer_element_ty(), INST_ATOMIC_CAS, 3, name, next) {
+  : atomic_inst(ptr->get_type()->get_pointer_element_ty(), INST_ATOMIC_CAS, 3, name, next) {
   set_operand(0, ptr);
   set_operand(1, cmp);
   set_operand(2, val);
@@ -759,7 +760,7 @@ instruction* atomic_cas_inst::create(value *ptr, value *cmp, value *val, const s
 // atomic exch
 
 atomic_exch_inst::atomic_exch_inst(value *ptr, value *val, const std::string &name, instruction *next)
-  : builtin_inst(ptr->get_type()->get_pointer_element_ty(), INST_ATOMIC_EXCH, 2, name, next) {
+  : atomic_inst(ptr->get_type()->get_pointer_element_ty(), INST_ATOMIC_EXCH, 2, name, next) {
   set_operand(0, ptr);
   set_operand(1, val);
 }
@@ -831,28 +832,32 @@ async_wait_inst* async_wait_inst::create(context &ctx, int N, const std::string 
   return new async_wait_inst(ctx, N, name, next);
 }
 
-
-// nv_dynamic_program_idx
-make_range_dyn::make_range_dyn(type *ty, const std::string &name, instruction *next)
-  : instruction(ty, INST_MAKE_RANGE_DYN, 0, name, next) { }
-
-make_range_dyn* make_range_dyn::create(type *ty, const std::string &name, instruction *next) {
-  return new make_range_dyn(ty, name, next);
+// prefetch_s
+prefetch_s_inst *prefetch_s_inst::create(context &ctx, value *arg, int inc, const std::string &name, instruction *next) {
+  return new prefetch_s_inst(ctx, arg, inc, name, next);
 }
 
-// nv_static_program_idx
-make_range_sta::make_range_sta(make_range *range)
-  : constant(range->get_type(), 0), range_(range) { }
+//// nv_dynamic_program_idx
+//make_range_dyn::make_range_dyn(type *ty, const std::string &name, instruction *next)
+//  : instruction(ty, INST_MAKE_RANGE_DYN, 0, name, next) { }
 
-make_range* make_range_sta::get_range() const
-{ return range_; }
+//make_range_dyn* make_range_dyn::create(type *ty, const std::string &name, instruction *next) {
+//  return new make_range_dyn(ty, name, next);
+//}
 
-make_range_sta* make_range_sta::get(make_range* range) {
-  static std::map<make_range*, make_range_sta*> cache;
-  if(cache.find(range) == cache.end())
-    cache.insert({range, new make_range_sta(range)});
-  return cache.at(range);
-}
+//// nv_static_program_idx
+//make_range_sta::make_range_sta(make_range *range)
+//  : constant(range->get_type(), 0), range_(range) { }
+
+//make_range* make_range_sta::get_range() const
+//{ return range_; }
+
+//make_range_sta* make_range_sta::get(make_range* range) {
+//  static std::map<make_range*, make_range_sta*> cache;
+//  if(cache.find(range) == cache.end())
+//    cache.insert({range, new make_range_sta(range)});
+//  return cache.at(range);
+//}
 
 
 // make_range
@@ -863,7 +868,7 @@ make_range *make_range::create(constant_int *first, constant_int *last) {
   assert(first->get_type()->is_integer_ty());
   assert(first->get_type() == last->get_type());
   assert(((constant_int*)first)->get_value() == 0);
-  type *ty = tile_type::get(first->get_type(), {(unsigned)last->get_value()});
+  type *ty = block_type::get(first->get_type(), {(unsigned)last->get_value()});
   return new make_range(ty, first, last);
 }
 

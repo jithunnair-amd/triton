@@ -54,10 +54,10 @@ class CMakeBuild(build_ext):
 
     def build_extension(self, ext):
         self.debug = True
-        # self.debug = False
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.path)))
         # create build directories
-        llvm_build_dir = os.path.join(tempfile.gettempdir(), "llvm")
+        build_suffix = 'debug' if self.debug else 'release'
+        llvm_build_dir = os.path.join(tempfile.gettempdir(), "llvm-" + build_suffix)
         if not os.path.exists(self.build_temp):
             os.makedirs(self.build_temp)
         if not os.path.exists(llvm_build_dir):
@@ -90,8 +90,9 @@ class CMakeBuild(build_ext):
                 cmake_args += ["-A", "x64"]
             build_args += ["--", "/m"]
         else:
+            import multiprocessing
             cmake_args += ["-DCMAKE_BUILD_TYPE=" + cfg]
-            build_args += ["--", "-j8"]
+            build_args += ["--", '-j' + str(2 * multiprocessing.cpu_count())]
 
         env = os.environ.copy()
         print("env", env)
@@ -110,7 +111,7 @@ setup(
     author_email="phil@openai.com",
     description="A language and compiler for custom Deep Learning operations",
     long_description="",
-    packages=["triton", "triton/_C", "triton/ops", "triton/ops/blocksparse"],
+    packages=["triton", "triton/_C", "triton/tools", "triton/ops", "triton/ops/blocksparse"],
     install_requires=["numpy", "torch"],
     package_data={"triton/ops": ["*.c"], "triton/ops/blocksparse": ["*.c"]},
     include_package_data=True,
@@ -120,7 +121,6 @@ setup(
     # for PyPI
     keywords=["Compiler", "Deep Learning"],
     url="https://github.com/ptillet/triton/",
-    download_url="https://github.com/ptillet/triton/archive/v0.1.tar.gz",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

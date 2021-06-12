@@ -11,6 +11,7 @@
 namespace llvm{
   class Type;
   class Value;
+  class PHINode;
   class BasicBlock;
   class Attribute;
   class Instruction;
@@ -74,6 +75,33 @@ struct distributed_axis {
   Value* thread_id;
 };
 
+class adder{
+public:
+  adder(Builder** builder): builder_(builder) { }
+  Value* operator()(Value* x, Value* y, const std::string& name = "");
+
+private:
+  Builder** builder_;
+};
+
+class multiplier{
+public:
+  multiplier(Builder** builder): builder_(builder) { }
+  Value* operator()(Value* x, Value* y, const std::string& name = "");
+private:
+  Builder** builder_;
+};
+
+class geper{
+public:
+  geper(Builder** builder): builder_(builder) { }
+  Value* operator()(Value *ptr, Value* off, const std::string& name = "");
+  Value* operator()(Type* ty, Value*ptr, std::vector<Value*> vals, const std::string& name = "");
+
+private:
+  Builder** builder_;
+};
+
 class generator: public ir::visitor, public analysis::layout_visitor {
 private:
   void init_idx(ir::value *x);
@@ -102,6 +130,10 @@ public:
   void visit_getelementptr_inst(ir::getelementptr_inst*);
   void visit_icmp_inst(ir::icmp_inst*);
   void visit_fcmp_inst(ir::fcmp_inst*);
+  std::tuple<Value*, Value*, Value*, Value*> fp8x4_to_fp32x4(Value *in0, Value *in1, Value *in2, Value *in3);
+  std::tuple<Value*, Value*, Value*, Value*> fp32x4_to_fp8x4(Value *in0, Value *in1, Value *in2, Value *in3);
+  std::tuple<Value*, Value*, Value*, Value*> fp8x4_to_fp16x4(Value *in0, Value *in1, Value *in2, Value *in3);
+  std::tuple<Value*, Value*, Value*, Value*> fp16x4_to_fp8x4(Value *in0, Value *in1, Value *in2, Value *in3);
   void visit_cast_inst(ir::cast_inst*);
   void visit_return_inst(ir::return_inst*);
   void visit_cond_branch_inst(ir::cond_branch_inst*);
@@ -119,10 +151,10 @@ public:
   void visit_exp_inst(ir::exp_inst*);
   void visit_log_inst(ir::log_inst*);
   void visit_get_program_id_inst(ir::get_program_id_inst*);
-  void visit_get_num_program_inst(ir::get_num_program_inst*);
+  void visit_get_num_programs_inst(ir::get_num_programs_inst*);
   void visit_atomic_cas_inst(ir::atomic_cas_inst*);
   void visit_atomic_exch_inst(ir::atomic_exch_inst*);
-  void visit_atomic_add_inst(ir::atomic_add_inst*);
+  void visit_atomic_rmw_inst(ir::atomic_rmw_inst*);
   void visit_mma884(ir::dot_inst*, ir::value *A, ir::value *B, ir::value *D, unsigned NK);
   void visit_mma16816(ir::dot_inst*, ir::value *A, ir::value *B, ir::value *D, unsigned NK);
   void visit_fmadot(ir::dot_inst*, ir::value *A, ir::value *B, ir::value *D, unsigned NK, Type *c_ty, Function *f_mul_add);
@@ -138,10 +170,11 @@ public:
   void visit_copy_to_shared_inst(ir::copy_to_shared_inst*);
   void visit_copy_from_shared_inst(ir::copy_from_shared_inst*);
   void visit_barrier_inst(ir::barrier_inst*);
+  void visit_prefetch_s_inst(ir::prefetch_s_inst*);
   void visit_async_wait_inst(ir::async_wait_inst*);
-  void visit_make_range_dyn(ir::make_range_dyn*);
+//  void visit_make_range_dyn(ir::make_range_dyn*);
   void visit_make_range(ir::make_range*);
-  void visit_make_range_sta(ir::make_range_sta*);
+//  void visit_make_range_sta(ir::make_range_sta*);
   void visit_undef_value(ir::undef_value*);
   void visit_constant_int(ir::constant_int*);
   void visit_constant_fp(ir::constant_fp*);
@@ -178,19 +211,32 @@ private:
   std::map<analysis::data_layout*, Value*> offset_b_k_;
   std::map<analysis::data_layout*, Value*> offset_b_n_;
 
+  /// layout -> base ptr
   std::map<analysis::data_layout*, Value*> shared_ptr_;
   std::map<analysis::data_layout*, Value*> shared_pre_ptr_;
   std::map<analysis::data_layout*, Value*> shared_next_ptr_;
+  /// offset for double-buffered layout
   std::map<analysis::data_layout*, Value*> shared_off_;
 
-
+  /// Base shmem pointer of ir value
   std::map<ir::value*, Value*> shmems_;
   std::map<ir::value*, Value*> shoffs_;
   std::map<ir::value*, std::vector<indices_t>> idxs_;
   std::map<ir::value*, std::map<indices_t, Value*>> vals_;
+  /// triton bb -> llvm bb
   std::map<ir::value*, BasicBlock *> bbs_;
   std::map<ir::value*, std::vector<int>> ords_;
 
+  // helper for creating llvm values
+  adder add;
+  multiplier mul;
+  geper gep;
+
+  /// PHI nodes
+  std::vector<std::tuple<llvm::PHINode*, Value*, ir::basic_block*>> lazy_phi_incs_;
+
+  /// Record prefetch instrs that needs to be moved
+  std::map<ir::value*, std::vector<Value*>> prefetch_latch_to_bb_;
 };
 
 }

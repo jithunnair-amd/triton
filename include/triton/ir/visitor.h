@@ -52,10 +52,11 @@ class exp_inst;
 class log_inst;
 
 class get_program_id_inst;
-class get_num_program_inst;
+class get_num_programs_inst;
+class atomic_inst;
 class atomic_cas_inst;
 class atomic_exch_inst;
-class atomic_add_inst;
+class atomic_rmw_inst;
 class dot_inst;
 class trans_inst;
 class sqrt_inst;
@@ -70,6 +71,7 @@ class barrier_inst;
 class async_wait_inst;
 class make_range_dyn;
 class make_range;
+class prefetch_s_inst;
 
 class make_range_sta;
 class undef_value;
@@ -128,10 +130,10 @@ public:
   virtual void visit_downcast_inst(downcast_inst*) = 0;
 
   virtual void visit_get_program_id_inst(get_program_id_inst*) = 0;
-  virtual void visit_get_num_program_inst(get_num_program_inst*) = 0;
+  virtual void visit_get_num_programs_inst(get_num_programs_inst*) = 0;
   virtual void visit_atomic_cas_inst(atomic_cas_inst*) = 0;
   virtual void visit_atomic_exch_inst(atomic_exch_inst*) = 0;
-  virtual void visit_atomic_add_inst(atomic_add_inst*) = 0;
+  virtual void visit_atomic_rmw_inst(atomic_rmw_inst*) = 0;
   virtual void visit_dot_inst(dot_inst*) = 0;
   virtual void visit_trans_inst(trans_inst*) = 0;
   virtual void visit_sqrt_inst(sqrt_inst*) = 0;
@@ -144,12 +146,13 @@ public:
   virtual void visit_masked_load_async_inst(masked_load_async_inst*)= 0;
   virtual void visit_barrier_inst(barrier_inst*) = 0;
   virtual void visit_async_wait_inst(async_wait_inst*) = 0;
-  virtual void visit_make_range_dyn(make_range_dyn*) = 0;
+//  virtual void visit_make_range_dyn(make_range_dyn*) = 0;
   virtual void visit_make_range(make_range*) = 0;
+  virtual void visit_prefetch_s_inst(prefetch_s_inst*) = 0;
 
   virtual void visit_function(function*) = 0;
 
-  virtual void visit_make_range_sta(make_range_sta*) = 0;
+//  virtual void visit_make_range_sta(make_range_sta*) = 0;
   virtual void visit_undef_value(undef_value*) = 0;
   virtual void visit_constant_int(constant_int*) = 0;
   virtual void visit_constant_fp(constant_fp*) = 0;

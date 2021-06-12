@@ -1,4 +1,6 @@
 ﻿#include <numeric>
+#include <sstream>
+#include <iomanip>
 #include "triton/codegen/selection/generator.h"
 #include "triton/codegen/target.h"
 #include "triton/codegen/analysis/axes.h"
@@ -24,17 +26,74 @@ namespace codegen{
 
 using namespace llvm;
 
+Value* adder::operator()(Value *x, Value *y, const std::string& name) {
+  // (x + cst) + y -> (x + y) + cst
+  if(auto* bin = dyn_cast<BinaryOperator>(x))
+  if(bin->getOpcode() == llvm::BinaryOperator::BinaryOps::Add)
+  if(dyn_cast<Constant>(bin->getOperand(1))){
+    return (*builder_)->CreateAdd((*builder_)->CreateAdd(bin->getOperand(0), y),
+                                  bin->getOperand(1));
+  }
+  // (x + (y + cst)) -> (x + y) + cst
+  if(auto* bin = dyn_cast<BinaryOperator>(y))
+  if(bin->getOpcode() == llvm::BinaryOperator::BinaryOps::Add)
+  if(dyn_cast<Constant>(bin->getOperand(1))){
+    return (*builder_)->CreateAdd((*builder_)->CreateAdd(x, bin->getOperand(0)),
+                                  bin->getOperand(1));
+  }
+
+  // default
+  return (*builder_)->CreateAdd(x, y, name);
+}
+
+Value* multiplier::operator()(Value *x, Value *y, const std::string &name) {
+  // (x + cst1) * cst2 -> (x * cst2) + (cst1 * cst2)
+  if(auto* bin = dyn_cast<BinaryOperator>(x))
+  if(bin->getOpcode() == llvm::BinaryOperator::BinaryOps::Add)
+  if(dyn_cast<Constant>(bin->getOperand(1)))
+  if(dyn_cast<Constant>(y)){
+    return (*builder_)->CreateAdd((*builder_)->CreateMul(bin->getOperand(0), y),
+                                  (*builder_)->CreateMul(bin->getOperand(1), y));
+  }
+  // default
+  return (*builder_)->CreateMul(x, y, name);
+}
+
+Value* geper::operator()(Value *ptr, Value* off, const std::string& name){
+  // (ptr + cst1) + (cst2) -> ptr + (cst1 + cst2)
+  if(auto* gep = dyn_cast<GetElementPtrInst>(ptr))
+  if(ConstantInt* cst1 = dyn_cast<ConstantInt>(gep->idx_begin()))
+  if(ConstantInt* cst2 = dyn_cast<ConstantInt>(off)){
+    return (*builder_)->CreateGEP(gep->getPointerOperand(),
+                                  (*builder_)->CreateAdd(cst1, cst2));
+  }
+  // ptr + (off + cst) -> (ptr + off) + cst
+  if(auto* bin = dyn_cast<BinaryOperator>(off))
+  if(bin->getOpcode() == llvm::BinaryOperator::BinaryOps::Add)
+  if(ConstantInt* cst = dyn_cast<ConstantInt>(bin->getOperand(1))){
+    return (*builder_)->CreateGEP((*builder_)->CreateGEP(ptr, bin->getOperand(0)),
+                                  bin->getOperand(1));
+  }
+  // default
+ return (*builder_)->CreateGEP(ptr, off, name);
+}
+
+//Value* geper::operator()(Type *ty, Value *ptr, std::vector<Value *> vals, const std::string &name) {
+//  return (*builder_)->CreateGEP(ty, ptr, vals, name);
+//}
+
+
 // types
 #define void_ty              builder_->getVoidTy()
 #define f16_ty               builder_->getHalfTy()
 #define f32_ty               builder_->getFloatTy()
+#define i8_ty               builder_->getInt8Ty()
 #define i32_ty               builder_->getInt32Ty()
 #define vec_ty(type, num_el) VectorType::get(type, num_el, false)
 #define ptr_ty(...)          PointerType::get(__VA_ARGS__)
 // constants
 #define i32(...)             builder_->getInt32(__VA_ARGS__)
 // ops
-#define add(...)             builder_->CreateAdd(__VA_ARGS__)
 #define and_(...)            builder_->CreateAnd(__VA_ARGS__)
 #define atomic_cmp_xchg(...) builder_->CreateAtomicCmpXchg(__VA_ARGS__)
 #define atomic_rmw(...)      builder_->CreateAtomicRMW(__VA_ARGS__)
@@ -52,7 +111,6 @@ using namespace llvm;
 #define fmul(...)            builder_->CreateFMul(__VA_ARGS__)
 #define fpcast(...)          builder_->CreateFPCast(__VA_ARGS__)
 #define fsub(...)            builder_->CreateFSub(__VA_ARGS__)
-#define gep(...)             builder_->CreateGEP(__VA_ARGS__)
 #define icmp(...)            builder_->CreateICmp(__VA_ARGS__)
 #define icmp_eq(...)         builder_->CreateICmpEQ(__VA_ARGS__)
 #define icmp_sge(...)        builder_->CreateICmpSGE(__VA_ARGS__)
@@ -61,15 +119,16 @@ using namespace llvm;
 #define insert_elt(...)      builder_->CreateInsertElement(__VA_ARGS__)
 #define intrinsic(...)       builder_->CreateIntrinsic(__VA_ARGS__)
 #define load(...)            builder_->CreateLoad(__VA_ARGS__)
+#define lshr(...)            builder_->CreateLShr(__VA_ARGS__)
 #define max_num(...)         builder_->CreateMaxNum(__VA_ARGS__)
 #define min_num(...)         builder_->CreateMinNum(__VA_ARGS__)
-#define mul(...)             builder_->CreateMul(__VA_ARGS__)
 #define neg(...)             builder_->CreateNeg(__VA_ARGS__)
 #define phi(...)             builder_->CreatePHI(__VA_ARGS__)
 #define ret(...)             builder_->CreateRet(__VA_ARGS__)
 #define select(...)          builder_->CreateSelect(__VA_ARGS__)
 #define store(...)           builder_->CreateStore(__VA_ARGS__)
 #define sub(...)             builder_->CreateSub(__VA_ARGS__)
+#define shl(...)             builder_->CreateShl(__VA_ARGS__)
 #define udiv(...)            builder_->CreateUDiv(__VA_ARGS__)
 #define urem(...)            builder_->CreateURem(__VA_ARGS__)
 #define splat(...)           builder_->CreateVectorSplat(__VA_ARGS__)
@@ -102,6 +161,7 @@ Type *generator::cvt(ir::type *ty) {
   // primitive types
   switch(ty->get_type_id()){
     case ir::type::VoidTyID:      return Type::getVoidTy(*ctx_);
+    case ir::type::FP8TyID:       return Type::getInt8Ty(*ctx_);
     case ir::type::HalfTyID:      return Type::getHalfTy(*ctx_);
     case ir::type::FloatTyID:     return Type::getFloatTy(*ctx_);
     case ir::type::DoubleTyID:    return Type::getDoubleTy(*ctx_);
@@ -141,7 +201,7 @@ generator::generator(analysis::axes *a_axes,
                     target *tgt,
                     unsigned num_warps)
   : a_axes_(a_axes), layouts_(layouts), alignment_(alignment), alloc_(alloc), swizzle_(swizzle),
-    tgt_(tgt), num_warps_(num_warps) {
+    tgt_(tgt), num_warps_(num_warps), add(&builder_), mul(&builder_), gep(&builder_) {
 
 }
 
@@ -152,7 +212,7 @@ void generator::visit_value(ir::value* v) {
   std::cout << "generator::visit_value" << std::endl;
   if(!seen_.insert(v).second)
     return;
-  if(v->get_type()->is_tile_ty()){
+  if(v->get_type()->is_block_ty()){
     if(analysis::shared_layout* layout = layouts_->get(v)->to_shared()){
       auto double_buffer = layout->get_double_buffer();
       // offset
@@ -207,8 +267,8 @@ void generator::visit_phi_node(ir::phi_node* x) {
  * \brief Code Generation for `binary_operator`
  */
 void generator::visit_binary_operator(ir::binary_operator*x) {
+  using ll = llvm::Instruction::BinaryOps;
   auto cvt = [](ir::binary_op_t op){
-    using ll = llvm::Instruction::BinaryOps;
     using tt = ir::binary_op_t;
     switch(op) {
       case tt::Add: return ll::Add;
@@ -235,7 +295,13 @@ void generator::visit_binary_operator(ir::binary_operator*x) {
   for(indices_t idx: idxs_.at(x)){
     Value *lhs = vals_[x->get_operand(0)][idx];
     Value *rhs = vals_[x->get_operand(1)][idx];
-    vals_[x][idx] = bin_op(cvt(x->get_op()), lhs, rhs);
+    auto op = cvt(x->get_op());
+    if(op == ll::Add)
+       vals_[x][idx] = add(lhs, rhs);
+     else if(op == ll::Mul)
+       vals_[x][idx] = mul(lhs, rhs);
+     else
+       vals_[x][idx] = bin_op(op, lhs, rhs);
   }
 }
 
@@ -248,8 +314,8 @@ void generator::visit_getelementptr_inst(ir::getelementptr_inst* x) {
     std::vector<Value*> vals;
     for(auto it= x->idx_begin(); it != x->idx_end(); it++)
       vals.push_back(vals_[*it][idx]);
-    Type *ty = cvt(x->get_source_elt_ty()->get_scalar_ty());
-    vals_[x][idx] = gep(ty, ptr, vals);
+    assert(vals.size() == 1);
+    vals_[x][idx] = gep(ptr, vals[0]);
   }
 }
 
@@ -320,10 +386,96 @@ void generator::visit_fcmp_inst(ir::fcmp_inst* x) {
   }
 }
 
+
+std::tuple<Value*, Value*, Value*, Value*> generator::fp32x4_to_fp8x4(Value *in0, Value *in1, Value *in2, Value *in3){
+    auto cvt = [this](Value *v){
+      if(ConstantFP* ci = dyn_cast<ConstantFP>(v))
+      if(ci->getValue().convertToFloat() == 0)
+          return builder_->getInt8(0);
+      throw std::runtime_error("unsupported cast");
+    };
+    return std::make_tuple(cvt(in0), cvt(in1), cvt(in2), cvt(in3));
+}
+
+std::tuple<Value*, Value*, Value*, Value*> generator::fp8x4_to_fp32x4(Value *in0, Value *in1, Value *in2, Value *in3){
+   Value *ret0, *ret1, *ret2, *ret3;
+   std::tie(ret0, ret1, ret2, ret3) = fp8x4_to_fp16x4(in0, in1, in2, in3);
+   ret0 = cast(llvm::Instruction::FPExt, ret0, f32_ty);
+   ret1 = cast(llvm::Instruction::FPExt, ret1, f32_ty);
+   ret2 = cast(llvm::Instruction::FPExt, ret2, f32_ty);
+   ret3 = cast(llvm::Instruction::FPExt, ret3, f32_ty);
+   return std::make_tuple(ret0, ret1, ret2, ret3);
+}
+
+
+std::tuple<Value*, Value*, Value*, Value*> generator::fp8x4_to_fp16x4(Value *in0, Value *in1, Value *in2, Value *in3){
+    Type *ret_ty = StructType::get(*ctx_, {vec_ty(f16_ty, 2), vec_ty(f16_ty, 2)});
+    InlineAsm *ptx = InlineAsm::get(FunctionType::get(ret_ty, {i32_ty}, false),
+    "{"
+    ".reg .b32 a<2>, b<2>;                  \n\t"
+    "prmt.b32 a0, 0, $2, 0x5140;            \n\t"
+    "prmt.b32 a1, 0, $2, 0x7362;            \n\t"
+    "lop3.b32 b0, a0, 0x7fff7fff, 0, 0xc0;  \n\t" // strip sign
+    "lop3.b32 b1, a1, 0x7fff7fff, 0, 0xc0;  \n\t"
+    "shr.b32  b0, b0, 1;                    \n\t" // shift into fp16 poistion
+    "shr.b32  b1, b1, 1;                    \n\t"
+    "lop3.b32 $0, b0, 0x80008000, a0, 0xf8; \n\t" // restore sign
+    "lop3.b32 $1, b1, 0x80008000, a1, 0xf8; \n\t"
+    "}", "=r,=r,r", false);
+    Value *packed_in = UndefValue::get(vec_ty(i8_ty, 4));
+    packed_in = insert_elt(packed_in, in0, (int)0);
+    packed_in = insert_elt(packed_in, in1, (int)1);
+    packed_in = insert_elt(packed_in, in2, (int)2);
+    packed_in = insert_elt(packed_in, in3, (int)3);
+    Value *in = bit_cast(packed_in, i32_ty);
+    Value *ret = call(ptx, {in});
+    Value *packed_ret0 = extract_val(ret, {0});
+    Value *packed_ret1 = extract_val(ret, {1});
+    Value *ret0 = extract_elt(packed_ret0, (int)0);
+    Value *ret1 = extract_elt(packed_ret0, (int)1);
+    Value *ret2 = extract_elt(packed_ret1, (int)0);
+    Value *ret3 = extract_elt(packed_ret1, (int)1);
+    return std::make_tuple(ret0, ret1, ret2, ret3);
+}
+
+
 /**
  * \brief Code Generation for `cast`
  */
 void generator::visit_cast_inst(ir::cast_inst* x) {
+  // <> FP8
+  ir::value *op = x->get_operand(0);
+  ir::type* ret_sca_ty = x->get_type()->get_scalar_ty();
+  ir::type* op_sca_ty = op->get_type()->get_scalar_ty();
+  if(ret_sca_ty->is_fp8_ty() || op_sca_ty->is_fp8_ty()){
+    // ensure that conversions can be vectorized
+    int ld = layouts_->get(x)->get_order(0);
+    int contiguous = layouts_->get(x)->to_scanline()->nts(ld);
+    if(contiguous % 4 != 0)
+        throw std::runtime_error("unsupported fp32 -> fp8 conversion");
+    auto x_idxs = idxs_.at(x);
+    auto op_idxs = idxs_.at(op);
+    // run the conversion
+    auto cvt = [&](Value* a, Value* b, Value* c, Value* d){
+      if(op_sca_ty->is_float_ty() && ret_sca_ty->is_fp8_ty())
+        return fp32x4_to_fp8x4(a, b, c, d);
+      if(op_sca_ty->is_fp8_ty() && ret_sca_ty->is_half_ty())
+        return fp8x4_to_fp16x4(a, b, c, d);
+      throw std::runtime_error("unsupported conversion");
+    };
+    for(size_t i = 0; i < x_idxs.size(); i+=4){
+        std::tie(vals_[x][x_idxs[i+0]],
+                 vals_[x][x_idxs[i+1]],
+                 vals_[x][x_idxs[i+2]],
+                 vals_[x][x_idxs[i+3]]) = cvt(vals_[op][op_idxs[i+0]],
+                                              vals_[op][op_idxs[i+1]],
+                                              vals_[op][op_idxs[i+2]],
+                                              vals_[op][op_idxs[i+3]]);
+    }
+    return;
+  }
+
+
   Type *ty = cvt(x->get_type()->get_scalar_ty());
   auto cvt = [](ir::cast_op_t op){
     using ll = llvm::Instruction::CastOps;
@@ -385,50 +537,135 @@ void generator::visit_load_inst(ir::load_inst* x){
   ir::value *op = x->get_pointer_operand();
   ir::masked_load_inst *mx = dynamic_cast<ir::masked_load_inst*>(x);
   Type* ty  = cvt(op->get_type()->get_scalar_ty()->get_pointer_element_ty());
-  int space = op->get_type()->get_scalar_ty()->get_pointer_address_space();
-
   // compute vector width
   size_t vec = 1;
-  if(op->get_type()->is_tile_ty()){
+  if(op->get_type()->is_block_ty()){
     auto   ord = ords_.at(op);
     size_t aln = alignment_->get(op, ord[0]);
     size_t nts = layouts_->get(x)->to_scanline()->nts(ord[0]);
     vec = std::min(nts, aln);
   }
-
   // code generation
   auto idxs = idxs_.at(x);
   for(size_t i = 0; i < idxs.size(); i += vec){
     indices_t idx = idxs[i];
     // pointer value
-    Value *ptr = bit_cast(vals_[op][idx], ptr_ty(vec_ty(ty, vec), space));
+    Value *ptr = vals_[op][idx];
     // masked load
-    Value *ret = nullptr;
-    if(false){
-      // if mask:
-      //   ret = load(ptr)
-      // else:
-      //   ret = false_value
-      PHINode *_ret = phi(ptr->getType()->getPointerElementType(), 2);
-      Instruction *then_term;
-      Instruction *else_term;
-      llvm::SplitBlockAndInsertIfThenElse(vals_[mx->get_mask_operand()][idx], _ret, &then_term, &else_term);
-      builder_->SetInsertPoint(then_term);
-      Value* then_ret = load(ptr);
-      builder_->SetInsertPoint(else_term);
-      Value* else_ret = splat(vec, vals_[mx->get_false_value_operand()][idx]);
-      builder_->SetInsertPoint(_ret->getParent());
-      _ret->addIncoming(then_ret, then_term->getParent());
-      _ret->addIncoming(else_ret, else_term->getParent());
-      ret = (Value*)_ret;
+    size_t dtsize = x->get_type()->get_scalar_ty()->get_primitive_size_in_bits() / 8;
+    // input ptr info
+    GetElementPtrInst *in_gep = dyn_cast<GetElementPtrInst>(ptr);
+    size_t in_off;
+    if(in_gep){
+        ConstantInt* cst = dyn_cast<ConstantInt>(in_gep->idx_begin());
+        in_off = cst ? cst->getValue().getSExtValue()*dtsize : 0;
+        ptr = cst ? in_gep->getPointerOperand() : in_gep;
     }
-    else
-      ret = load(ptr);
-    // write back
+    else{
+        in_off = 0;
+    }
+    Value *pred = mx ? vals_[mx->get_mask_operand()][idx] : builder_->getTrue();
+    Value *other = mx ? vals_[mx->get_false_value_operand()][idx] : nullptr;
+    size_t nbits = dtsize*8;
+    // pack sub-words (< 32/64bits) into words
+    // each load has width min(nbits*vec, 32/64)
+    // and there are (nbits * vec)/width of them
+    int max_word_width = std::max<int>(32, nbits);
+    int tot_width = nbits*vec;
+    int width = std::min(tot_width, max_word_width);
+    int n_words = std::max(1, tot_width / width);
+    // -----
+    // create inline asm string
+    // -----
+    std::ostringstream asm_oss;
+    asm_oss << "@$" << n_words; // predicate
+    asm_oss << " ld.global.cg";
+    if(n_words > 1)
+      asm_oss << ".v" << n_words; // vector width
+    asm_oss << ".b" << width; // word size
+    asm_oss << " {";
+    for(int i = 0; i < n_words; i++){ // return values
+      if(i > 0) asm_oss << ",";
+      asm_oss << "$" << i;
+    }
+    asm_oss << "}";
+    asm_oss << ", [ $" << n_words + 1; // load
+    asm_oss << " + " << in_off << "];"; // constant offset
+    bool has_other = other && (other != UndefValue::get(other->getType()));
+    std::vector<Value *> others;
+    // handle `other` values for indices where the mask
+    // is false
+    if(has_other)
+    for(size_t ii = 0; ii < n_words; ii++){
+      size_t size = width / nbits;
+      Value *v = UndefValue::get(vec_ty(ty, size));
+      for(size_t s = 0; s < size; s++){
+        ir::value *false_val = mx->get_false_value_operand();
+        v = insert_elt(v, vals_[false_val][idxs[i + ii*size + s]], s);
+      }
+      v = bit_cast(v, IntegerType::get(*ctx_, width));
+      asm_oss << "\n        ";
+      asm_oss << "@!$" << n_words << " mov.u" << width;
+      asm_oss << " $" << ii << ", ";
+      std::ios_base::fmtflags flags(asm_oss.flags());
+      if(ConstantInt* cst = dyn_cast<ConstantInt>(v))
+        asm_oss << "0x" << std::hex << cst->getSExtValue();
+      else{
+        asm_oss << "$" << n_words + 2 + ii;
+        others.push_back(v);
+      }
+      asm_oss.flags(flags);
+      asm_oss << ";";
+    }
+    // ----
+    // create inline ASM signature
+    // ---
+    std::vector<Type*> ret_tys(n_words, IntegerType::get(*ctx_, width));
+    Type* ret_ty = ret_tys.size() > 1 ? StructType::get(*ctx_, ret_tys) : ret_tys[0];
+    std::vector<Type*> arg_tys = {pred->getType(), ptr->getType()};
+    for(Value *v: others)
+        arg_tys.push_back(v->getType());
+    FunctionType *asm_ty = FunctionType::get(ret_ty, arg_tys, false);
+    // ---
+    // create inline ASM constraints
+    // ---
+    std::string asm_cstrt;
+    for(int ii = 0; ii < n_words; ii++){
+      if(ii > 0) asm_cstrt += ",";
+      asm_cstrt += (width == 64) ? "=l" : ((width == 32) ? "=r" : "=c");
+    }
+    asm_cstrt += ",b,l";
+    for(size_t ii = 0; ii < others.size(); ii++){
+      asm_cstrt += ",";
+      asm_cstrt += (width == 64) ? "l" : ((width == 32) ? "r" : "c");
+    }
+    // ---
+    // finally call inline ASM
+    // ---
+    InlineAsm *_asm = InlineAsm::get(asm_ty, asm_oss.str(), asm_cstrt, true);
+    std::vector<Value*> args = {pred, ptr};
+    for(Value *v: others)
+        args.push_back(v);
+    Value *_ret = call(_asm, args);
+    // ---
+    // extract and store return values
+    // ---
+    std::vector<Value *> rets;
+    for(unsigned int ii = 0; ii < n_words; ii++){
+      Value *curr;
+      if(ret_ty->isStructTy())
+          curr = extract_val(_ret, {ii});
+      else
+          curr = _ret;
+//      std::cout << n_words << " " << vec << " " << width << " " << dtsize << " " << nbits << std::endl;
+      rets.push_back(bit_cast(curr, vec_ty(ty, width / (dtsize*8))));
+    }
+    int tmp = (width / (dtsize * 8));
     for(size_t ii = 0; ii < vec; ii++)
-      vals_[x][idxs[i+ii]] = extract_elt(ret, ii);
+      vals_[x][idxs[i+ii]] = extract_elt(rets[ii/tmp], ii % tmp);
   }
 }
+
 void generator::visit_unmasked_load_inst(ir::unmasked_load_inst* x) {
   std::cout << "generator::visit_unmasked_load_inst" << std::endl;
   visit_load_inst(x);
@@ -449,7 +686,7 @@ void generator::visit_store_inst(ir::store_inst * x){
   ir::value *val_op = x->get_value_operand();
   // vector size
   size_t vec = 1;
-  if(val_op->get_type()->is_tile_ty()){
+  if(val_op->get_type()->is_block_ty()){
     auto ord = ords_.at(x->get_pointer_operand());
     size_t aln = alignment_->get(ptr_op, ord[0]);
     size_t nts = axes_.at(a_axes_->get(x->get_pointer_operand(), ord[0])).contiguous;
@@ -469,7 +706,10 @@ void generator::visit_store_inst(ir::store_inst * x){
     if(mx){
       Value *msk = vals_[mx->get_mask_operand()][idx];
       Instruction *no_op = intrinsic(Intrinsic::donothing, {}, {});
+      builder_->SetInsertPoint(no_op->getParent());
+      Instruction* dummy = builder_->CreateRet(nullptr);
       Instruction *term = llvm::SplitBlockAndInsertIfThen(msk, no_op, false);
+      dummy->removeFromParent();
       builder_->SetInsertPoint(term);
       store(val, ptr);
       builder_->SetInsertPoint(no_op);
@@ -509,13 +749,15 @@ void generator::visit_splat_inst(ir::splat_inst* x) {
  */
 void generator::visit_broadcast_inst(ir::broadcast_inst* x) {
   ir::value* op = x->get_operand(0);
-  const auto& shape = op->get_type()->get_tile_shapes();
+  const auto& shape = op->get_type()->get_block_shapes();
   for(auto out_idx: idxs_.at(x)){
     indices_t in_idx = out_idx;
     for(size_t k = 0; k < in_idx.size(); k++)
       in_idx[k] = shape[k] == 1 ? i32(0) : in_idx[k];
     vals_[x][out_idx] = vals_[op][in_idx];
   }
+//  for(size_t i = 0; i < idxs_.at(x).size(); i++)
+//    vals_[x][idxs_[x][i]] = vals_[op][idxs_[op][i]];
 }
 
 /**
@@ -535,9 +777,9 @@ void generator::visit_get_program_id_inst(ir::get_program_id_inst* pid) {
 }
 
 /**
- * \brief Code Generation for `get_num_program`
+ * \brief Code Generation for `get_num_programs`
  */
-void generator::visit_get_num_program_inst(ir::get_num_program_inst* np) {
+void generator::visit_get_num_programs_inst(ir::get_num_programs_inst* np) {
   Module *module = builder_->GetInsertBlock()->getModule();
   Value *ret = tgt_->get_num_blocks(module, *builder_, np->get_axis());
   vals_[np][{}] = ret;
@@ -550,7 +792,7 @@ void generator::visit_exp_inst(ir::exp_inst* x){
   Constant *log2e = ConstantFP::get(f32_ty, 1.4426950408889634);
   std::vector<llvm::Type*> tys = {f32_ty};
   FunctionType *fn_ty = FunctionType::get(f32_ty, tys, false);
-  InlineAsm *ex2 = InlineAsm::get(fn_ty, "ex2.approx.f32 $0, $1;", "=f,f", false);
+  InlineAsm *ex2 = InlineAsm::get(fn_ty, "ex2.approx.f32 $0, $0;", "=f,0", false);
   for(auto idx: idxs_.at(x)){
     Value *ex2arg = fmul(vals_[x->get_operand(0)][idx], log2e);
     vals_[x][idx] = call(ex2, std::vector<llvm::Value*>{ex2arg});
@@ -580,28 +822,35 @@ void generator::visit_atomic_cas_inst(ir::atomic_cas_inst* cas) {
   Module *module = current->getModule();
   Value *tid = tgt_->get_local_id(module, *builder_, 0);
   Value *pred = icmp_eq(tid, i32(0));
-  BasicBlock *tid_0_bb = BasicBlock::Create(*ctx_, "tid_0", current->getParent());
-  BasicBlock *tid_0_done_bb = BasicBlock::Create(*ctx_, "tid_0_done", current->getParent());
+//  BasicBlock *tid_0_bb = BasicBlock::Create(*ctx_, "tid_0", current->getParent());
+//  BasicBlock *tid_0_done_bb = BasicBlock::Create(*ctx_, "tid_0_done", current->getParent());
   add_barrier();
   tgt_->add_memfence(module, *builder_);
-  cond_br(pred, tid_0_bb, tid_0_done_bb);
-  builder_->SetInsertPoint(tid_0_bb);
+  Value *atom_ptr;
+  atom_ptr = gep(shmem_, i32(alloc_->offset(layouts_->get(layouts_->tmp(cas)))), "");
+  atom_ptr = bit_cast(atom_ptr, ptr_ty(cvt(cas->get_type()->get_scalar_ty()), 3));
+//  cond_br(pred, tid_0_bb, tid_0_done_bb);
+//  builder_->SetInsertPoint(tid_0_bb);
   Value *cas_ptr = vals_[cas->get_operand(0)][{}];
   Value *cas_cmp = vals_[cas->get_operand(1)][{}];
   Value *cas_val = vals_[cas->get_operand(2)][{}];
-  Value *old = atomic_cmp_xchg(cas_ptr, cas_cmp, cas_val, AtomicOrdering::Monotonic, AtomicOrdering::Monotonic);
-  old = extract_val(old, std::vector<unsigned>{0});
-  Value *atom_ptr;
-  atom_ptr = gep(shmem_, i32(alloc_->offset(layouts_->get(layouts_->tmp(cas)))), "");
-  atom_ptr = bit_cast(atom_ptr, ptr_ty(old->getType(), 3));
-  store(old, atom_ptr);
-  br(tid_0_done_bb);
-  builder_->SetInsertPoint(tid_0_done_bb);
+  std::string asm_str = "@$1 atom.global.cas.b32 $0, [$2], $3, $4;";
+  FunctionType *fn_ty = FunctionType::get(i32_ty, {pred->getType(), cas_ptr->getType(), cas_cmp->getType(), cas_val->getType()}, false);
+  InlineAsm *iasm = InlineAsm::get(fn_ty, asm_str, "=r,b,l,r,r", true);
+  add_barrier();
+  Value *old = call(iasm, {pred, cas_ptr, cas_cmp, cas_val});
+  add_barrier();
+
+  std::string asm2_str = "@$0 st.shared.b32 [$1], $2;";
+  FunctionType *fn2_ty = FunctionType::get(void_ty, {pred->getType(), atom_ptr->getType(), old->getType()}, false);
+  InlineAsm *iasm2 = InlineAsm::get(fn2_ty, asm2_str, "b,r,r", true);
+  add_barrier();
+  call(iasm2, {pred, atom_ptr, old});
   tgt_->add_memfence(module, *builder_);
   add_barrier();
   vals_[cas][{}] = load(atom_ptr);
+  add_barrier();
 }
-
 /**
  * \brief Code Generation for `atomic_exch`
  */
@@ -628,86 +877,86 @@ void generator::visit_atomic_exch_inst(ir::atomic_exch_inst* xchg) {
 /**
  * \brief Code Generation for `atomic_add`
  */
-//TODO: clean-up
-void generator::visit_atomic_add_inst(ir::atomic_add_inst* add) {
-  std::cout << "generator::visit_atomic_add_inst" << std::endl;
+void generator::visit_atomic_rmw_inst(ir::atomic_rmw_inst *atom) {
+  ir::value* ptr = atom->get_operand(0);
+  ir::value* val = atom->get_operand(1);
+  ir::value* msk = atom->get_operand(2);
 
-  if(add->get_type()->is_tile_ty()){
-    ir::value* ptr = add->get_operand(0);
-    ir::value* val = add->get_operand(1);
-    ir::value* msk = add->get_operand(2);
-
-    // vector size
-    int vec = 1;
+  // vector size
+  int vec = 1;
+  if(atom->get_type()->is_block_ty()){
     int ld = ords_.at(ptr)[0];
     unsigned alignment = alignment_->get(ptr, ld);
     vec = std::min<int>(layouts_->get(ptr)->to_scanline()->nts(ld), alignment);
     vec = std::min(vec, val->get_type()->get_tile_element_ty()->is_half_ty() ? 2 : 1);
-
-    for(int i = 0; i < idxs_.at(val).size(); i += vec){
-      auto idx = idxs_[val][i];
-      Value *rmw_val = UndefValue::get(vec_ty(vals_[val][idx]->getType(), vec));
-      for(int ii = 0; ii < vec; ii++)
-        rmw_val = insert_elt(rmw_val, vals_[val][idxs_[val][i+ii]], ii);
-      Value *rmw_ptr = vals_[ptr][idx];
-      Value *rmw_msk = vals_[msk][idx];
-      if(vec == 1)
-        rmw_val = extract_elt(rmw_val, i32(0));
-      Type* ty = rmw_val->getType();
-      size_t nbits = ty->getScalarSizeInBits();
-      // extract pointer offset
-      std::string offset = "";
-      if(GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(rmw_ptr))
-      if(gep->getNumIndices() == 1)
-      if(ConstantInt *cst = dyn_cast<ConstantInt>(gep->idx_begin())){
-        offset = " + " + std::to_string(cst->getValue().getSExtValue()*nbits/8);
-        rmw_ptr = gep->getPointerOperand();
-      }
-      rmw_ptr = bit_cast(rmw_ptr, ty->getPointerTo(1));
-      // asm argument type
-      std::vector<Type*> arg_ty = {rmw_msk->getType(), rmw_ptr->getType(), rmw_val->getType()};
-      // asm function type
-      FunctionType *fn_ty = FunctionType::get(ty, arg_ty, false);
-      // asm string
-      std::string suffix = vec == 2 ? "x2" : "";
-      std::string mod = nbits == 32 ? "" : ".noftz";
-      std::string asm_str = "@$0 atom.global.gpu.add" + mod + ".f" + std::to_string(nbits) + suffix + " $1, [$2" + offset + "], $3;";
-      std::string ty_id = nbits == 32 ? "f" : (vec == 1 ? "h" : "r");
-      std::string constraint = "b,=" + ty_id + ",l," + ty_id;
-      // create inline asm
-      InlineAsm *iasm = InlineAsm::get(fn_ty, asm_str, constraint, true);
-      // call asm
-      call(iasm, (ArrayRef<Value*>{rmw_msk, rmw_ptr, rmw_val}));
-    }
   }
-  else{
-    Value *rmw_ptr = vals_[add->get_operand(0)][{}];
-    Value *rmw_val = vals_[add->get_operand(1)][{}];
-    Value *rmw_msk = vals_[add->get_operand(2)][{}];
+
+  for(int i = 0; i < idxs_.at(val).size(); i += vec){
+    auto idx = idxs_[val][i];
+    Value *rmw_val = UndefValue::get(vec_ty(vals_[val][idx]->getType(), vec));
+    for(int ii = 0; ii < vec; ii++)
+      rmw_val = insert_elt(rmw_val, vals_[val][idxs_[val][i+ii]], ii);
+    Value *rmw_ptr = vals_[ptr][idx];
+    Value *rmw_msk = vals_[msk][idx];
+    if(vec == 1)
+      rmw_val = extract_elt(rmw_val, i32(0));
     Type* ty = rmw_val->getType();
     size_t nbits = ty->getScalarSizeInBits();
+    // extract pointer offset
+    std::string offset = "";
+    if(GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(rmw_ptr))
+    if(gep->getNumIndices() == 1)
+    if(ConstantInt *cst = dyn_cast<ConstantInt>(gep->idx_begin())){
+      offset = " + " + std::to_string(cst->getValue().getSExtValue()*nbits/8);
+      rmw_ptr = gep->getPointerOperand();
+    }
+    rmw_ptr = bit_cast(rmw_ptr, ty->getPointerTo(1));
+    // asm argument type
     std::vector<Type*> arg_ty = {rmw_msk->getType(), rmw_ptr->getType(), rmw_val->getType()};
+    // asm function type
     FunctionType *fn_ty = FunctionType::get(ty, arg_ty, false);
+    // asm string
+    std::string s_nbits = std::to_string(nbits);
+    std::string name;
+    std::string s_ty;
+    using tt = ir::atomic_rmw_op_t;
+    switch(atom->get_op()){
+      case tt::Or: name = "or"; s_ty = "b"; break;
+      case tt::And: name = "and"; s_ty = "b"; break;
+      case tt::Xor: name = "xor", s_ty = "b"; break;
+      case tt::Add: name = "add" , s_ty = "s"; break;
+      case tt::Min: name = "min", s_ty = "s"; break;
+      case tt::Max: name = "max", s_ty = "s"; break;
+      case tt::UMin: name = "min", s_ty = "u"; break;
+      case tt::UMax: name = "max", s_ty = "u"; break;
+      case tt::FAdd: name = "add", s_ty = "f"; break;
+    }
+    std::string s_vec = vec == 2 ? "x2" : "";
     std::string mod = nbits == 32 ? "" : ".noftz";
-    std::string asm_str = "@$0 atom.global.gpu.add" + mod + ".f" + std::to_string(nbits) + " $1, [$2], $3;";
-    std::string ty_id = nbits == 32 ? "f" : "h";
-    InlineAsm *iasm = InlineAsm::get(fn_ty, asm_str, "b,="+ty_id+",l,"+ty_id, true);
 
-    BasicBlock *current = builder_->GetInsertBlock();
-    Module *module = current->getModule();
-
-    Value *tid = tgt_->get_local_id(module, *builder_, 0);
-    Value *pred = icmp_eq(tid, i32(0));
-    BasicBlock *tid_0_bb = BasicBlock::Create(*ctx_, "tid_0", current->getParent());
-    BasicBlock *tid_0_done_bb = BasicBlock::Create(*ctx_, "tid_0_done", current->getParent());
-    tgt_->add_memfence(module, *builder_);
-    add_barrier();
-    cond_br(pred, tid_0_bb, tid_0_done_bb);
-    builder_->SetInsertPoint(tid_0_bb);
-    call(iasm, (ArrayRef<Value*>{rmw_msk, rmw_ptr, rmw_val}));
-    br(tid_0_done_bb);
-    builder_->SetInsertPoint(tid_0_done_bb);
-    tgt_->add_memfence(module, *builder_);
+    std::string asm_str = "@$1 atom.global.gpu." + name + mod + "." + s_ty + s_nbits + s_vec + " $0, [$2" + offset + "], $3;";
+    std::string ty_id = nbits*vec == 32 ? "r" : "h";
+    std::string constraint = "=" + ty_id + ",b,l," + ty_id;
+    // create inline asm
+    InlineAsm *iasm = InlineAsm::get(fn_ty, asm_str, constraint, true);
+    // call asm
+    if(atom->get_type()->is_block_ty())
+      vals_[atom][idx] = call(iasm, (ArrayRef<Value*>{rmw_msk, rmw_ptr, rmw_val}));
+    else{
+      Module *mod = builder_->GetInsertBlock()->getModule();
+      tgt_->add_memfence(mod, *builder_);
+      add_barrier();
+      Value *tid = tgt_->get_local_id(mod, *builder_, 0);
+      rmw_msk = builder_->CreateAnd(rmw_msk, icmp_eq(tid, i32(0)));
+      Value *old = call(iasm, (ArrayRef<Value*>{rmw_msk, rmw_ptr, rmw_val}));
+      Value *atom_ptr;
+      atom_ptr = gep(shmem_, i32(alloc_->offset(layouts_->get(layouts_->tmp(atom)))), "");
+      atom_ptr = bit_cast(atom_ptr, ptr_ty(old->getType(), 3));
+      store(old, atom_ptr);
+      add_barrier();
+      vals_[atom][idx] = load(atom_ptr);
+      add_barrier();
+    }
   }
 }
 
@@ -718,9 +967,9 @@ void generator::visit_atomic_add_inst(ir::atomic_add_inst* add) {
 void generator::visit_mma884(ir::dot_inst* C, ir::value *A, ir::value *B, ir::value *D, unsigned NK) {
   std::cout << "generator::visit_mma884" << std::endl;
   // shapes
-  auto shape_c = C->get_type()->get_tile_shapes();
-  auto shape_a = A->get_type()->get_tile_shapes();
-  auto shape_b = B->get_type()->get_tile_shapes();
+  auto shape_c = C->get_type()->get_block_shapes();
+  auto shape_a = A->get_type()->get_block_shapes();
+  auto shape_b = B->get_type()->get_block_shapes();
   // order
   auto ord_a = layouts_->get(A)->get_order();
   auto ord_b = layouts_->get(B)->get_order();
@@ -818,48 +1067,11 @@ void generator::visit_mma884(ir::dot_inst* C, ir::value *A, ir::value *B, ir::va
   for(indices_t idx: idxs_.at(C))
     acc.push_back(vals_[D][idx]);
 
-  // update accumulators
   unsigned num_m = layout_c->rep(0) * shape_c[0] / layout_c->spt(0);
   unsigned num_n = layout_c->rep(1) * shape_c[1] / layout_c->spt(1);
-  for(unsigned m = 0; m < num_m/2; m++)
-  for(unsigned n = 0; n < num_n/2; n++)
-  for(unsigned K = 0; K < NK; K += 4){
-    if(has.find({m, K}) == has.end()){
-      Value* ptra = ptr_a[(is_a_row ? K/4 : m) % num_ptr_a];
-      int step_am = is_a_row ? m : m / (num_ptr_a)*(num_ptr_a);
-      int step_ak = is_a_row ? K / (num_ptr_a*vec_a)*(num_ptr_a*vec_a) : K;
-      Value* pa =  gep(ptra, i32(step_am*stride_rep_m*stride_am + step_ak*stride_ak));
-      Value* ha = load(bit_cast(pa, ptr_ty(vec_ty(i32_ty, vec_a/2), 3)));
-      Value *ha00 = bit_cast(extract_elt(ha, i32(0)), f16x2_ty);
-      Value *ha01 = bit_cast(extract_elt(ha, i32(1)), f16x2_ty);
-      has[{m, K}]   = {ha00, ha01};
-      if(vec_a > 4){
-        Value *ha10 = bit_cast(extract_elt(ha, i32(2)), f16x2_ty);
-        Value *ha11 = bit_cast(extract_elt(ha, i32(3)), f16x2_ty);
-        if(is_a_row)
-          has[{m, K+4}] = {ha10, ha11};
-        else
-          has[{m+1, K}] = {ha10, ha11};
-      }
-    }
-    if(hbs.find({n, K}) == hbs.end()){
-      Value* ptrb = ptr_b[(is_b_row? n : K/4) % num_ptr_b];
-      int stepbn = is_b_row ? n / (num_ptr_b)*(num_ptr_b) : n;
-      int stepbk = is_b_row ? K : K / (num_ptr_b*vec_b)*(num_ptr_b*vec_b);
-      Value* pb =   gep(ptrb, i32(stepbn*stride_rep_n*stride_bn + stepbk*stride_bk));
-      Value* hb =   load(bit_cast(pb, ptr_ty(vec_ty(i32_ty, vec_b/2), 3)));
-      Value *hb00 = bit_cast(extract_elt(hb, i32(0)), f16x2_ty);
-      Value *hb01 = bit_cast(extract_elt(hb, i32(1)), f16x2_ty);
-      hbs[{n, K}]   = {hb00, hb01};
-      if(vec_b > 4){
-        Value *hb10 = bit_cast(extract_elt(hb, i32(2)), f16x2_ty);
-        Value *hb11 = bit_cast(extract_elt(hb, i32(3)), f16x2_ty);
-        if(is_b_row)
-          hbs[{n+1, K}] = {hb10, hb11};
-        else
-          hbs[{n, K+4}] = {hb10, hb11};
-      }
-    }
+
+  // create mma & unpack result
+  auto call_mma = [&](unsigned m, unsigned n, unsigned K) {
     auto ha = has[{m, K}];
     auto hb = hbs[{n, K}];
     // arguments
@@ -877,6 +1089,140 @@ void generator::visit_mma884(ir::dot_inst* C, ir::value *A, ir::value *B, ir::va
     // unpack
     for(unsigned i = 0; i < 8; i++)
       acc[idx[i]] = extract_val(nc, {i});
+  };
+
+  ir::phi_node* phiA = dynamic_cast<ir::phi_node*>(A);
+  ir::phi_node* phiB = dynamic_cast<ir::phi_node*>(B);
+  
+  // Cache lds value. If values are prefetched, create phi node
+  // @param inc: incoming block (0 = header, 1 = loop)
+  auto register_lds = 
+    [&](decltype(has)& vals, int m, int K, int inc, Value* val0, Value *val1, bool is_prefetch) {
+      if (K == 0 && is_prefetch) {
+        ir::basic_block* inc_block = phiA->get_incoming_block(inc);
+        lazy_phi_incs_.push_back(std::make_tuple((PHINode*)vals[{m, K}].first, val0, inc_block));
+        lazy_phi_incs_.push_back(std::make_tuple((PHINode*)vals[{m, K}].second, val1, inc_block));
+      } else
+        vals[{m, K}] = {val0, val1};
+  };
+
+  auto load_a = [&](int m, int K, int inc, bool is_prefetch) {
+    int offidx = (is_a_row ? K/4 : m) % num_ptr_a;
+    Value* ptra;
+    if(K==0 && is_prefetch){
+      if(inc == 0)
+        ptra = gep(shared_pre_ptr_[layout_a], off_a[offidx]);
+      else
+        ptra = gep(shared_next_ptr_[layout_a], off_a[offidx]);
+    }
+    else
+      ptra = ptr_a[offidx];
+    int step_am = is_a_row ? m : m / (num_ptr_a)*(num_ptr_a);
+    int step_ak = is_a_row ? K / (num_ptr_a*vec_a)*(num_ptr_a*vec_a) : K;
+    Value* pa =  gep(ptra, i32(step_am*stride_rep_m*stride_am + step_ak*stride_ak));
+    Value* ha = load(bit_cast(pa, ptr_ty(vec_ty(i32_ty, vec_a/2), 3)));
+    // record lds that needs to be moved
+    if (K == 0 && inc == 1 && is_prefetch)
+      prefetch_latch_to_bb_[phiA->get_incoming_value(1)].push_back(ha);
+    Value *ha00 = bit_cast(extract_elt(ha, i32(0)), f16x2_ty);
+    Value *ha01 = bit_cast(extract_elt(ha, i32(1)), f16x2_ty);
+    register_lds(has, m, K, inc, ha00, ha01, is_prefetch);
+    if(vec_a > 4){
+      Value *ha10 = bit_cast(extract_elt(ha, i32(2)), f16x2_ty);
+      Value *ha11 = bit_cast(extract_elt(ha, i32(3)), f16x2_ty);
+      if(is_a_row)
+        register_lds(has, m, K+4, inc, ha10, ha11, is_prefetch);
+      else
+        register_lds(has, m+1, K, inc, ha10, ha11, is_prefetch);
+    }
+  };
+
+  auto load_b = [&](int n, int K, int inc, bool is_prefetch) {
+    int offidx = (is_b_row? n : K/4) % num_ptr_b;
+    Value* ptrb;
+    if(K==0 && is_prefetch){
+      if(inc == 0)
+        ptrb = gep(shared_pre_ptr_[layout_b], off_b[offidx]);
+      else
+        ptrb = gep(shared_next_ptr_[layout_b], off_b[offidx]);
+    } else
+      ptrb = ptr_b[offidx];
+
+    int stepbn = is_b_row ? n / (num_ptr_b)*(num_ptr_b) : n;
+    int stepbk = is_b_row ? K : K / (num_ptr_b*vec_b)*(num_ptr_b*vec_b);
+    Value* pb =   gep(ptrb, i32(stepbn*stride_rep_n*stride_bn + stepbk*stride_bk));
+    Value* hb =   load(bit_cast(pb, ptr_ty(vec_ty(i32_ty, vec_b/2), 3)));
+    // record lds that needs to be moved
+    if (K == 0 && inc == 1 && is_prefetch)
+      prefetch_latch_to_bb_[phiB->get_incoming_value(1)].push_back(hb);
+    Value *hb00 = bit_cast(extract_elt(hb, i32(0)), f16x2_ty);
+    Value *hb01 = bit_cast(extract_elt(hb, i32(1)), f16x2_ty);
+    register_lds(hbs, n, K, inc, hb00, hb01, is_prefetch);
+    if(vec_b > 4){
+      Value *hb10 = bit_cast(extract_elt(hb, i32(2)), f16x2_ty);
+      Value *hb11 = bit_cast(extract_elt(hb, i32(3)), f16x2_ty);
+      if(is_b_row)
+        register_lds(hbs, n+1, K, inc, hb10, hb11, is_prefetch);
+      else
+        register_lds(hbs, n, K+4, inc, hb10, hb11, is_prefetch);
+    }
+
+  };
+
+  // update accumulators
+  if (C->is_prefetched()) {
+    // create phis
+    builder_->SetInsertPoint(curr_bb->getFirstNonPHI());
+    for (unsigned m = 0; m < num_m/2; m += is_a_row?1:2) {
+      has[{m, 0}].first = phi(f16x2_ty, 2);
+      has[{m, 0}].second = phi(f16x2_ty, 2);
+      if (!is_a_row && vec_a>4) {
+        has[{m+1, 0}].first = phi(f16x2_ty, 2);
+        has[{m+1, 0}].second = phi(f16x2_ty, 2);
+      }
+    }
+    for (unsigned n = 0; n < num_n/2; n += is_b_row?2:1) {
+      hbs[{n, 0}].first = phi(f16x2_ty, 2);
+      hbs[{n, 0}].second = phi(f16x2_ty, 2);
+      if (is_b_row && vec_b>4) {
+        hbs[{n+1, 0}].first = phi(f16x2_ty, 2);
+        hbs[{n+1, 0}].second = phi(f16x2_ty, 2);
+      }
+    }
+
+    // insert prefetched lds at the end of loop header
+    builder_->SetInsertPoint(bbs_[phiA->get_incoming_block(0)]->getTerminator());
+    for (unsigned m = 0; m < num_m/2; m += is_a_row?1:2)
+      load_a(m, 0, 0, true);
+    for (unsigned n = 0; n < num_n/2; n += is_b_row?2:1)
+      load_b(n, 0, 0, true);
+    
+    // update accumulators
+    builder_->SetInsertPoint(curr_bb);
+    for (unsigned K = 0; K < NK; K += 4) {
+      int NEXTK = (K + 4) % NK;
+      // prefetch A
+      for (unsigned m = 0; m < num_m/2; m+=is_a_row?1:2)
+        load_a(m, NEXTK, 1, true);
+      // prefetch B
+      for (unsigned n = 0; n < num_n/2; n+=is_b_row?2:1)
+        load_b(n, NEXTK, 1, true);
+      // tensor core ops
+      for(unsigned m = 0; m < num_m/2; m++)
+      for(unsigned n = 0; n < num_n/2; n++){
+        call_mma(m, n, K);
+      }
+    }
+  } else { // not prefetched    
+    for(unsigned K = 0; K < NK; K += 4)
+    for(unsigned m = 0; m < num_m/2; m++)
+    for(unsigned n = 0; n < num_n/2; n++) {
+      if(has.find({m, K}) == has.end())
+        load_a(m, K, /*inc*/0, /*is_prefetch*/false);
+      if(hbs.find({n, K}) == hbs.end())
+        load_b(n, K, /*inc*/0, /*is_prefetch*/false);
+      call_mma(m, n, K);
+    }
   }
 
   // write back accumulators
@@ -889,8 +1235,7 @@ void generator::visit_mma884(ir::dot_inst* C, ir::value *A, ir::value *B, ir::va
  */
 //TODO: clean-up
 void generator::visit_mma16816(ir::dot_inst* dot, ir::value *A, ir::value *B, ir::value *D, unsigned NK) {
-  std::cout << "generator::visit_mma16816" << std::endl;
-  const auto& shapes = dot->get_type()->get_tile_shapes();
+  const auto& shapes = dot->get_type()->get_block_shapes();
 
   std::map<std::vector<Value*>, std::vector<Value*>> fcs;
 
@@ -900,8 +1245,8 @@ void generator::visit_mma16816(ir::dot_inst* dot, ir::value *A, ir::value *B, ir
     fcs[key].push_back(vals_[D][idx]);
   };
 
-  auto shape_a = A->get_type()->get_tile_shapes();
-  auto shape_b = B->get_type()->get_tile_shapes();
+  auto shape_a = A->get_type()->get_block_shapes();
+  auto shape_b = B->get_type()->get_block_shapes();
   auto ord_a = layouts_->get(A)->get_order();
   auto ord_b = layouts_->get(B)->get_order();
   analysis::mma_layout* layout = layouts_->get(dot)->to_mma();
@@ -1072,10 +1417,9 @@ void generator::visit_mma16816(ir::dot_inst* dot, ir::value *A, ir::value *B, ir
  * \brief Code Generation for FMA-based `dot` (FP32, FP64, Default)
  */
 void generator::visit_fmadot(ir::dot_inst* C, ir::value* A, ir::value* B, ir::value* D, unsigned NK, Type *c_ty, Function *f_mul_add) {
-  std::cout << "generator::visit_fmadot" << std::endl;
-  auto shape_c = C->get_type()->get_tile_shapes();
-  auto shape_a = A->get_type()->get_tile_shapes();
-  auto shape_b = B->get_type()->get_tile_shapes();
+  auto shape_c = C->get_type()->get_block_shapes();
+  auto shape_a = A->get_type()->get_block_shapes();
+  auto shape_b = B->get_type()->get_block_shapes();
   auto ord_a = layouts_->get(A)->get_order();
   auto ord_b = layouts_->get(B)->get_order();
   analysis::scanline_layout* layout_c = layouts_->get(C)->to_scanline();
@@ -1176,7 +1520,7 @@ void generator::visit_dot_inst(ir::dot_inst* dot) {
   ir::value *D = dot->get_operand(2);
   Type *c_ty = cvt(D->get_type()->get_scalar_ty());
   Function *f_mul_add = Intrinsic::getDeclaration(module, Intrinsic::fmuladd, std::vector<llvm::Type*>{c_ty});
-  auto A_shapes = A->get_type()->get_tile_shapes();
+  auto A_shapes = A->get_type()->get_block_shapes();
   size_t red_axis = 1;
   unsigned NK = A_shapes[red_axis];
   bool is_outer = NK == 1;
@@ -1223,7 +1567,7 @@ void generator::visit_reduce1d_inst(ir::reduce_inst* x, std::function<Value*(Val
   std::cout << "generator::visit_reduce1d_inst" << std::endl;
   std::map<indices_t, Value*> partial;
   ir::value *arg = x->get_operand(0);
-  Type *ty = cvt(x->get_type()->get_scalar_ty());
+  Type *ret_ty = cvt(x->get_type()->get_scalar_ty());
   Value *acc = nullptr;
 
   // reduce within thread
@@ -1232,13 +1576,13 @@ void generator::visit_reduce1d_inst(ir::reduce_inst* x, std::function<Value*(Val
     acc = !acc ? val : do_acc(acc, val);
   }
   // reduce within wrap
-  InlineAsm *shfl = InlineAsm::get(FunctionType::get(ty, {ty, i32_ty}, false),
+  InlineAsm *shfl = InlineAsm::get(FunctionType::get(ret_ty, {ret_ty, i32_ty}, false),
                                    "shfl.sync.bfly.b32 $0, $1, $2, 0x1f, 0xffffffff;", "=f,f,r", false);
   for(int i = 16; i > 0; i >>= 1)
     acc = do_acc(acc, call(shfl, {acc, i32(i)}));
   // pointers
   unsigned addr_space = shmem_->getType()->getPointerAddressSpace();
-  Value *base = bit_cast(shmem_, ptr_ty(ty, addr_space));
+  Value *base = bit_cast(shmem_, ptr_ty(ret_ty, addr_space));
   Value* thread = tgt_->get_local_id(mod_, *builder_, 0);
   Value* warp = udiv(thread, i32(32));
   Value* lane = urem(thread, i32(32));
@@ -1252,7 +1596,10 @@ void generator::visit_reduce1d_inst(ir::reduce_inst* x, std::function<Value*(Val
   // reduce across warps
   Value *cond = icmp_eq(warp, i32(0));
   Instruction *barrier = add_barrier();
+  builder_->SetInsertPoint(barrier->getParent());
+  Instruction* dummy = builder_->CreateRet(nullptr);
   Instruction *term = llvm::SplitBlockAndInsertIfThen(cond, barrier, false);
+  dummy->removeFromParent();
   builder_->SetInsertPoint(term);
   Value* ret = load(gep(base, thread));
   for(int i = (num_warps_+1)/2; i > 0; i >>= 1){
@@ -1355,10 +1702,10 @@ void generator::visit_reduce_inst(ir::reduce_inst* x) {
   // neutral element
   Value *neutral;
   switch(op) {
-    case ir::reduce_inst::ADD: neutral = i32(0); break;
-    case ir::reduce_inst::SUB:  neutral = i32(0); break;
-    case ir::reduce_inst::MAX:  neutral = i32(INT32_MIN); break;
-    case ir::reduce_inst::MIN:  neutral = i32(INT32_MAX); break;
+    case ir::reduce_inst::ADD: neutral = ConstantInt::get(ty, 0); break;
+    case ir::reduce_inst::SUB:  neutral = ConstantInt::get(ty, 0); break;
+    case ir::reduce_inst::MAX:  neutral = ConstantInt::get(ty, INT32_MIN); break;
+    case ir::reduce_inst::MIN:  neutral = ConstantInt::get(ty, INT32_MAX); break;
     case ir::reduce_inst::FADD: neutral = ConstantFP::get(ty, 0); break;
     case ir::reduce_inst::FSUB: neutral = ConstantFP::get(ty, 0); break;
     case ir::reduce_inst::FMAX: neutral = ConstantFP::get(ty, -INFINITY); break;
@@ -1376,10 +1723,11 @@ void generator::visit_reduce_inst(ir::reduce_inst* x) {
  * \brief Code Generation for `select`
  */
 void generator::visit_select_inst(ir::select_inst* x) {
-  for(indices_t idx: idxs_.at(x))
+  for(indices_t idx: idxs_.at(x)){
     vals_[x][idx] = select(vals_[x->get_operand(0)][idx],
                            vals_[x->get_operand(1)][idx],
                            vals_[x->get_operand(2)][idx]);
+  }
 }
 
 /**
@@ -1387,7 +1735,7 @@ void generator::visit_select_inst(ir::select_inst* x) {
  */
 void generator::visit_recoalesce_inst(ir::recoalesce_inst* rc) {
   ir::value *op = rc->get_operand(0);
-  ir::tile_type::tile_shapes_t shape = rc->get_type()->get_tile_shapes();
+  ir::block_type::block_shapes_t shape = rc->get_type()->get_block_shapes();
   // pointer to temporary shared memory
   Type *ty = cvt(rc->get_type()->get_scalar_ty());
   // layout
@@ -1453,7 +1801,7 @@ void generator::visit_masked_load_async_inst(ir::masked_load_async_inst* x){
   int in_ld = in_layout->get_shape()[in_order[0]] / in_layout->mts(in_order[0]);
   int n_shared_1 = std::max<int>(per_phase*max_phase / in_layout->mts(in_order[1]), 1);
   int n_shared_0 = std::max<int>(in_vec    / out_vec, 1);
-  auto shapes = x->get_type()->get_tile_shapes();
+  auto shapes = x->get_type()->get_block_shapes();
   BasicBlock* CurrBB = builder_->GetInsertBlock();
   BasicBlock* FirstBB = &CurrBB->getParent()->getEntryBlock();
   std::map<std::pair<int, int>, Value*> tmp;
@@ -1489,11 +1837,14 @@ void generator::visit_masked_load_async_inst(ir::masked_load_async_inst* x){
   for(size_t i = 0; i < idxs_.at(arg).size(); i += in_vec){
     auto idx = idxs_[arg][i];
     // input ptr info
+    Value *ptr = vals_[arg][idx];
+    size_t in_off = 0;
     GetElementPtrInst *in_gep = dyn_cast<GetElementPtrInst>(vals_[arg][idx]);
-    Value *in_base = in_gep->getPointerOperand();
-    ConstantInt* cst = dyn_cast<ConstantInt>(in_gep->idx_begin());
-    size_t in_off = cst ? cst->getValue().getSExtValue()*dtsize*in_vec : 0;
-    in_base = cst ? in_base : in_gep;
+    if(in_gep){
+      ConstantInt* cst = dyn_cast<ConstantInt>(in_gep->idx_begin());
+      in_off = cst ? cst->getValue().getSExtValue()*dtsize : 0;
+      ptr= cst ? in_gep->getPointerOperand() : in_gep;
+    }
     // output ptr info
     Value* out_base = shared[i].first;
     int out_off = shared[i].second*dtsize;
@@ -1505,9 +1856,9 @@ void generator::visit_masked_load_async_inst(ir::masked_load_async_inst* x){
 //      is_zero_false_value = cst->isZeroValue();
     Value* src_size = builder_->CreateSelect(vals_[x->get_mask_operand()][idx], i32(in_vec*dtsize), i32(0));
     std::string asm_str = "cp.async" + mod + ".shared.global [$0 + " + std::to_string(out_off) + "], [$1 + " + std::to_string(in_off) + "], " + std::to_string(in_vec*dtsize) + ", $2;";
-    FunctionType *ty = FunctionType::get(void_ty, {out_base->getType(), in_base->getType(), builder_->getInt32Ty()}, false);
+    FunctionType *ty = FunctionType::get(void_ty, {out_base->getType(), ptr->getType(), builder_->getInt32Ty()}, false);
     InlineAsm *iasm = InlineAsm::get(ty, asm_str, "r,l,r", true);
-    call(iasm, {out_base, in_base, src_size});
+    call(iasm, {out_base, ptr, src_size});
   }
 
   std::string asm_str = "cp.async.commit_group;";
@@ -1539,7 +1890,7 @@ void generator::visit_copy_to_shared_inst(ir::copy_to_shared_inst* cts) {
 
   BasicBlock* CurrBB = builder_->GetInsertBlock();
   BasicBlock* FirstBB = &CurrBB->getParent()->getEntryBlock();
-  auto shapes = cts->get_type()->get_tile_shapes();
+  auto shapes = cts->get_type()->get_block_shapes();
 
   // store to shared
   Value *current = nullptr;
@@ -1560,7 +1911,10 @@ void generator::visit_copy_to_shared_inst(ir::copy_to_shared_inst* cts) {
       int off = (off_1*shapes[in_order[0]] + off_0);
       std::pair<int, int> key = {id_1  % n_shared_1, id_0 % n_shared_0};
       if(ptrs.find(key) == ptrs.end()){
-        builder_->SetInsertPoint(FirstBB->getTerminator());
+        if(FirstBB->getTerminator())
+            builder_->SetInsertPoint(FirstBB->getTerminator());
+        else
+            builder_->SetInsertPoint(FirstBB);
         indices_t idx = idxs_.at(arg).at(key.first*in_ld);
         Value* phase = udiv(idx[in_order[1]], i32(per_phase));
         phase = urem(phase, i32(max_phase));
@@ -1594,40 +1948,74 @@ void generator::visit_barrier_inst(ir::barrier_inst*) {
   add_barrier();
 }
 
+void generator::visit_prefetch_s_inst(ir::prefetch_s_inst *i) {
+  ir::value *v = i->get_operand(0);
+  int inc = i->get_inc();
+  if (inc == 0) {
+    // If dot has not been visitied, do nothing.
+  } else {
+    // If dot has been visitied, insert prefetched lds
+    assert(inc == 1);
+    assert(prefetch_latch_to_bb_.find(v) != prefetch_latch_to_bb_.end() && 
+           "dot hasn't be visited");
+    // sink lds & extract element
+    // move lds & all uses to current location
+    std::stack<Value*> work_stack;
+    for (Value *value : prefetch_latch_to_bb_[v])
+      work_stack.push(value);
+    std::vector<Instruction*> dead_instrs;
+    while (!work_stack.empty()) {
+      Value *m = work_stack.top();
+      work_stack.pop();
+
+      for (auto u : m->users())
+        work_stack.push(u);
+
+      assert(isa<Instruction>(m));
+      auto m_instr = static_cast<Instruction*>(m);
+
+      m_instr->removeFromParent();
+      m_instr->insertAfter(&*std::prev(builder_->GetInsertBlock()->end()));
+      assert(m_instr->getParent() == &*builder_->GetInsertBlock());
+      builder_->SetInsertPoint(m_instr->getParent());
+    }
+  }  
+}
+
 void generator::visit_async_wait_inst(ir::async_wait_inst* i) {
   std::string asm_str = "cp.async.wait_group " + std::to_string(i->get_N()) + ";";
   InlineAsm *iasm = InlineAsm::get(FunctionType::get(void_ty, {}), asm_str, "", true);
   call(iasm);
 }
 
-void generator::visit_make_range_dyn(ir::make_range_dyn* x) {
-  for(indices_t idx: idxs_.at(x)){
-    assert(idx.size() == 1);
-    if(idx[0] == i32(0))
-      vals_[x][idx] = idx[0];
-    else{
-      BinaryOperator *bin_add = dyn_cast<BinaryOperator>(idx[0]);
-      assert(bin_add);
-      vals_[x][idx] = bin_add->getOperand(0);
-    }
-  }
-}
+//void generator::visit_make_range_dyn(ir::make_range_dyn* x) {
+//  for(indices_t idx: idxs_.at(x)){
+//    assert(idx.size() == 1);
+//    if(idx[0] == i32(0))
+//      vals_[x][idx] = idx[0];
+//    else{
+//      BinaryOperator *bin_add = dyn_cast<BinaryOperator>(idx[0]);
+//      assert(bin_add);
+//      vals_[x][idx] = bin_add->getOperand(0);
+//    }
+//  }
+//}
 
-void generator::visit_make_range_sta(ir::make_range_sta* x) {
-  for(indices_t idx: idxs_.at(x)){
-    assert(idx.size() == 1);
-    if(idx[0] == i32(0)){
-      vals_[x][idx] = idx[0];
-    }
-    else{
-      BinaryOperator *bin_add = dyn_cast<BinaryOperator>(idx[0]);
-      assert(bin_add);
-      Value *cst = bin_add->getOperand(1);
-      assert(isa<Constant>(cst));
-      vals_[x][idx] = cst;
-    }
-  };
-}
+//void generator::visit_make_range_sta(ir::make_range_sta* x) {
+//  for(indices_t idx: idxs_.at(x)){
+//    assert(idx.size() == 1);
+//    if(idx[0] == i32(0)){
+//      vals_[x][idx] = idx[0];
+//    }
+//    else{
+//      BinaryOperator *bin_add = dyn_cast<BinaryOperator>(idx[0]);
+//      assert(bin_add);
+//      Value *cst = bin_add->getOperand(1);
+//      assert(isa<Constant>(cst));
+//      vals_[x][idx] = cst;
+//    }
+//  };
+//}
 
 void generator::visit_make_range(ir::make_range* x) {
   for(indices_t idx: idxs_.at(x)){
@@ -1914,6 +2302,7 @@ void generator::visit_basic_block(ir::basic_block * block) {
   for(ir::instruction *i: block->get_inst_list()){
     visit_value(i);
   }
+  // Update ir bb -> llvm bb mapping
   bbs_[block] = builder_->GetInsertBlock();
 }
 
@@ -1924,13 +2313,13 @@ void generator::visit_argument(ir::argument* arg) {
 void generator::init_idx(ir::value *v) {
   std::cout << "generator::init_idx" << std::endl;
   idxs_[v].clear();
-  if(!v->get_type()->is_tile_ty()){
+  if(!v->get_type()->is_block_ty()){
     idxs_[v].push_back({});
     return;
   }
   if(layouts_->get(v)->to_shared())
     return;
-  const auto &shapes = v->get_type()->get_tile_shapes();
+  const auto &shapes = v->get_type()->get_block_shapes();
   size_t rank = shapes.size();
   std::vector<distributed_axis> axes(rank);
   std::vector<int> ord(rank);
@@ -2020,6 +2409,8 @@ void generator::finalize_function(ir::function *fn) {
   for(ir::instruction *inst: block->get_inst_list())
     if(auto *phi = dynamic_cast<ir::phi_node*>(inst))
       finalize_phi_node(phi);
+  for(auto& x: lazy_phi_incs_)
+    std::get<0>(x)->addIncoming(std::get<1>(x), bbs_[std::get<2>(x)]);
 }
 
 void generator::finalize_phi_node(ir::phi_node *x) {

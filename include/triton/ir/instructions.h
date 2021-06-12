@@ -452,16 +452,6 @@ public:
   _TRITON_DEFINE_ACCEPT(masked_load_async_inst)
 };
 
-class atomic_add_inst: public io_inst {
-private:
-  atomic_add_inst(value *ptr, value *val, value *msk, const std::string &name = "", instruction *next = nullptr);
-  std::string repr_impl() const { return "atomic_add"; }
-  _TRITON_DEFINE_CLONE(atomic_add_inst)
-  _TRITON_DEFINE_ACCEPT(atomic_add_inst)
-
-public:
-  static instruction* create(value *ptr, value *val, value *msk, const std::string &name = "", instruction *next = nullptr);
-};
 
 
 // store
@@ -514,7 +504,7 @@ public:
 
 class retile_inst: public unary_inst {
 protected:
-  retile_inst(value *arg, value_id_t id, const type::tile_shapes_t &shapes, const std::string &name, instruction *next);
+  retile_inst(value *arg, value_id_t id, const type::block_shapes_t &shapes, const std::string &name, instruction *next);
 };
 
 // reshape
@@ -525,7 +515,7 @@ private:
   std::string repr_impl() const { return "reshape"; }
 
 public:
-  static instruction* create(value *arg, const type::tile_shapes_t &shape_suffix,
+  static instruction* create(value *arg, const type::block_shapes_t &shape_suffix,
                       const std::string &name = "", instruction *next = nullptr);
   _TRITON_DEFINE_CLONE(reshape_inst)
   _TRITON_DEFINE_ACCEPT(reshape_inst)
@@ -539,7 +529,7 @@ private:
   std::string repr_impl() const { return "splat"; }
 
 public:
-  static instruction* create(value *arg, const type::tile_shapes_t &shape_suffix,
+  static instruction* create(value *arg, const type::block_shapes_t &shape_suffix,
                       const std::string &name = "", instruction *next = nullptr);
   _TRITON_DEFINE_CLONE(splat_inst)
   _TRITON_DEFINE_ACCEPT(splat_inst)
@@ -553,7 +543,7 @@ private:
   std::string repr_impl() const { return "broadcast"; }
 
 public:
-  static instruction* create(value *arg, const type::tile_shapes_t &shape_suffix,
+  static instruction* create(value *arg, const type::block_shapes_t &shape_suffix,
                       const std::string &name = "", instruction *next = nullptr);
   _TRITON_DEFINE_CLONE(broadcast_inst)
   _TRITON_DEFINE_ACCEPT(broadcast_inst)
@@ -597,22 +587,43 @@ private:
   unsigned axis_;
 };
 
-class get_num_program_inst: public builtin_inst {
+class get_num_programs_inst: public builtin_inst {
 private:
-  get_num_program_inst(type *ty, unsigned axis, const std::string &name, instruction *next);
-  std::string repr_impl() const { return "get_num_program(" + std::to_string(axis_) + ")"; }
+  get_num_programs_inst(type *ty, unsigned axis, const std::string &name, instruction *next);
+  std::string repr_impl() const { return "get_num_programs(" + std::to_string(axis_) + ")"; }
 
 public:
   static instruction* create(context &ctx, unsigned axis, const std::string &name = "", instruction *next = nullptr);
   unsigned get_axis() const { return axis_; }
-  _TRITON_DEFINE_CLONE(get_num_program_inst)
-  _TRITON_DEFINE_ACCEPT(get_num_program_inst)
+  _TRITON_DEFINE_CLONE(get_num_programs_inst)
+  _TRITON_DEFINE_ACCEPT(get_num_programs_inst)
 
 private:
   unsigned axis_;
 };
 
-class atomic_cas_inst: public builtin_inst {
+
+class atomic_inst: public io_inst {
+public:
+  using io_inst::io_inst;
+};
+
+class atomic_rmw_inst: public atomic_inst {
+private:
+  atomic_rmw_inst(atomic_rmw_op_t op, value *ptr, value *val, value *msk, const std::string &name = "", instruction *next = nullptr);
+  std::string repr_impl() const { return "atomic_rmw"; }
+  _TRITON_DEFINE_CLONE(atomic_rmw_inst)
+  _TRITON_DEFINE_ACCEPT(atomic_rmw_inst)
+
+public:
+  static instruction* create(atomic_rmw_op_t op, value *ptr, value *val, value *msk, const std::string &name = "", instruction *next = nullptr);
+  atomic_rmw_op_t get_op() { return op_; }
+
+private:
+  atomic_rmw_op_t op_;
+};
+
+class atomic_cas_inst: public atomic_inst {
 private:
   atomic_cas_inst(value *ptr, value *cmp, value *val, const std::string &name, instruction *next);
   std::string repr_impl() const { return "atomic_cas"; }
@@ -623,7 +634,7 @@ public:
   static instruction* create(value *ptr, value *cmp, value *val, const std::string &name = "", instruction *next = nullptr);
 };
 
-class atomic_exch_inst: public builtin_inst {
+class atomic_exch_inst: public atomic_inst {
 private:
   atomic_exch_inst(value *ptr, value *val, const std::string &name = "", instruction *next = nullptr);
   std::string repr_impl() const { return "atomic_exch"; }
@@ -665,6 +676,11 @@ public:
 private:
   dot_inst(value *A, value *B, value *C, TransT AT, TransT BT, const std::string &name, instruction *next);
   std::string repr_impl() const { return "dot"; }
+
+  bool is_prefetched_ = false;
+public:
+  bool is_prefetched() const { return is_prefetched_; }
+  void set_prefetched(bool is_prefetched) { is_prefetched_ = is_prefetched; }
 
 public:
   static instruction *create(value *A, value *B, value *C, bool AT, bool BT, const std::string &name = "", instruction *next = nullptr);
@@ -821,33 +837,50 @@ private:
   int N_;
 };
 
-// On NVIDIA, implementation is such that
-// constant_range = nv_dynamic_program_idx + nv_static_program_idx
-// so as to enable re-association on nv_static_program_idx which is constant
-class make_range_dyn: public instruction {
-private:
-  make_range_dyn(type *ty, const std::string &name, instruction *next);
-  std::string repr_impl() const { return "nv_dynamic_program_idx"; }
-  _TRITON_DEFINE_CLONE(make_range_dyn)
-  _TRITON_DEFINE_ACCEPT(make_range_dyn)
-
+class prefetch_s_inst : public instruction {
+  std::string repr_impl() const { return "prefetch_s"; }
+  _TRITON_DEFINE_CLONE(prefetch_s_inst)
+  _TRITON_DEFINE_ACCEPT(prefetch_s_inst)
+  
+  /// inc_: 0->first, 1->latch
+  int inc_ = 0;
 public:
-  static make_range_dyn* create(type *ty, const std::string &name = "", instruction *next = nullptr);
+  prefetch_s_inst(context &ctx, value *arg, int inc, const std::string &name, instruction *next) 
+    : instruction(type::get_void_ty(ctx), INST_PREFETCH_S, 1, name, next), inc_(inc) {
+    set_operand(0, arg);
+  }
+  int get_inc() const { return inc_; }
+  static prefetch_s_inst *create(context &ctx, value *arg, int inc, const std::string &name = "",
+   instruction *next=nullptr);
 };
 
-class make_range_sta: public constant {
-private:
-  make_range_sta(make_range *range);
+//// On NVIDIA, implementation is such that
+//// constant_range = nv_dynamic_program_idx + nv_static_program_idx
+//// so as to enable re-association on nv_static_program_idx which is constant
+//class make_range_dyn: public instruction {
+//private:
+//  make_range_dyn(type *ty, const std::string &name, instruction *next);
+//  std::string repr_impl() const { return "nv_dynamic_program_idx"; }
+//  _TRITON_DEFINE_CLONE(make_range_dyn)
+//  _TRITON_DEFINE_ACCEPT(make_range_dyn)
 
-public:
-  static make_range_sta *get(make_range* range);
-  make_range* get_range() const;
-  std::string repr() const { return "nv_static_program_idx"; }
-  _TRITON_DEFINE_ACCEPT(make_range_sta)
+//public:
+//  static make_range_dyn* create(type *ty, const std::string &name = "", instruction *next = nullptr);
+//};
 
-private:
-  make_range *range_;
-};
+//class make_range_sta: public constant {
+//private:
+//  make_range_sta(make_range *range);
+
+//public:
+//  static make_range_sta *get(make_range* range);
+//  make_range* get_range() const;
+//  std::string repr() const { return "nv_static_program_idx"; }
+//  _TRITON_DEFINE_ACCEPT(make_range_sta)
+
+//private:
+//  make_range *range_;
+//};
 
 
 /* constant range */

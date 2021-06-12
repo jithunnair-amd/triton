@@ -5,9 +5,9 @@ confs = [
     triton.testing.Benchmark(
               x_names = ['N'],
               x_vals  = [128, 256, 512, 1024, 2048, 3072, 4096, 6144, 8192],
-              y_name  = 'provider',
-              y_vals  = ['triton', 'torch'],
-              y_lines = ['Triton', 'Torch'],
+              line_arg  = 'provider',
+              line_vals  = ['triton', 'torch'],
+              line_names = ['Triton', 'Torch'],
               ylabel  = 'GBPS',
               plot_name = f'{mode}-2048',
               args = {'M': 2048, 'dtype': torch.float16, 'mode': mode}
@@ -32,9 +32,9 @@ def bench_op(M, N, dtype, mode, provider):
         y = op(x, idx)
         dy = torch.randn_like(y)
         fn = lambda: y.backward(dy, retain_graph=True)
-        mean_ms, min_ms, max_ms = triton.testing.do_bench(fn, grad_to_none=x)
+        mean_ms, min_ms, max_ms = triton.testing.do_bench(fn, grad_to_none=[x])
     return gbps(mean_ms), gbps(min_ms), gbps(max_ms)
 
 
 if __name__ == '__main__':
-    bench_op.run('tmp', False)
+    bench_op.run(print_data=True)

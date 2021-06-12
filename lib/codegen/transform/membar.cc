@@ -37,7 +37,7 @@ int membar::group_of(ir::value* v, std::vector<ir::value*> &async_write) {
 membar::val_set_t membar::intersect_with(const val_set_t& as, const val_set_t& bs) {
   val_set_t ret;
   for(ir::value* a: as){
-    if(!a->get_type()->is_tile_ty())
+    if(!a->get_type()->is_block_ty())
       continue;
     analysis::shared_layout* a_layout = layouts_->get(a)->to_shared();
     if(!a_layout)
@@ -45,7 +45,7 @@ membar::val_set_t membar::intersect_with(const val_set_t& as, const val_set_t& b
     int a_start = alloc_->offset(a_layout);
     int a_end = a_start + a_layout->get_size();
     for(ir::value* b: bs){
-      if(!b->get_type()->is_tile_ty())
+      if(!b->get_type()->is_block_ty())
         continue;
       analysis::shared_layout* b_layout = layouts_->get(b)->to_shared();
       if(!b_layout)
@@ -80,7 +80,7 @@ void membar::transfer(ir::basic_block *block,
     // Get shared memory reads
     std::set<ir::value*> read;
     std::copy_if(i->op_begin(), i->op_end(), std::inserter(read, read.begin()),
-                 [&](ir::value* i){ return i->get_type()->is_tile_ty() && layouts_->get(i)->to_shared();});
+                 [&](ir::value* i){ return i->get_type()->is_block_ty() && layouts_->get(i)->to_shared();});
     // RAW (async)
     val_set_t tmp;
     std::copy(async_write.begin(), async_write.end(), std::inserter(tmp, tmp.begin()));
@@ -96,7 +96,15 @@ void membar::transfer(ir::basic_block *block,
       }
     }
     // RAW, WAR
-    if(intersect_with(read, sync_write).size() || intersect_with({i}, sync_read).size()){
+    bool is_i_double_buffered = i->get_type()->is_block_ty() &&
+                                layouts_->get(i)->to_shared() &&
+                                layouts_->get(i)->to_shared()->get_double_buffer();
+    // WAR barrier is not required when data is double-buffered
+    // TODO: how about other patterns, like WWAR?
+    if(!intersect_with(read, sync_write).empty() || 
+       (!intersect_with({i}, sync_read).empty() && !is_i_double_buffered) ||
+       // force WAR barrier on A100
+       (!intersect_with({i}, sync_read).empty() && tgt_->as_nvidia()->sm() >= 80)){
       builder.set_insert_point(i);
       barrier = (ir::barrier_inst*)builder.create_barrier();
       inserted = true;
@@ -133,6 +141,7 @@ void membar::run(ir::module &mod) {
   }
 
   for(ir::function *fn: mod.get_function_list()){
+    // TODO: (dyan) we need DominatorTree here.
     std::vector<ir::basic_block*> rpo = ir::cfg::reverse_post_order(fn);
     std::map<ir::basic_block*, val_vec_t> async_writes;
     std::map<ir::basic_block*, val_set_t> sync_writes;
