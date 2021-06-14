@@ -533,7 +533,6 @@ void generator::visit_uncond_branch_inst(ir::uncond_branch_inst* br) {
  * \brief Code Generation for a (synchronous) `load`
  */
 void generator::visit_load_inst(ir::load_inst* x){
-  std::cout << "generator::visit_load_inst" << std::endl;
   ir::value *op = x->get_pointer_operand();
   ir::masked_load_inst *mx = dynamic_cast<ir::masked_load_inst*>(x);
   Type* ty  = cvt(op->get_type()->get_scalar_ty()->get_pointer_element_ty());
@@ -667,11 +666,9 @@ void generator::visit_load_inst(ir::load_inst* x){
 }
 
 void generator::visit_unmasked_load_inst(ir::unmasked_load_inst* x) {
-  std::cout << "generator::visit_unmasked_load_inst" << std::endl;
   visit_load_inst(x);
 }
 void generator::visit_masked_load_inst(ir::masked_load_inst* x) {
-  std::cout << "generator::visit_masked_load_inst" << std::endl;
   visit_load_inst(x);
 }
 
@@ -679,7 +676,6 @@ void generator::visit_masked_load_inst(ir::masked_load_inst* x) {
  * \brief Code Generation for a (synchronous) `store`
  */
 void generator::visit_store_inst(ir::store_inst * x){
-  std::cout << "generator::visit_store_inst" << std::endl;
   ir::masked_store_inst *mx = dynamic_cast<ir::masked_store_inst*>(x);
   // operands
   ir::value *ptr_op = x->get_pointer_operand();
@@ -817,7 +813,6 @@ void generator::visit_log_inst(ir::log_inst* x){
  * \brief Code Generation for `atomic_cas`
  */
 void generator::visit_atomic_cas_inst(ir::atomic_cas_inst* cas) {
-  std::cout << "generator::visit_atomic_cas_inst" << std::endl;
   BasicBlock *current = builder_->GetInsertBlock();
   Module *module = current->getModule();
   Value *tid = tgt_->get_local_id(module, *builder_, 0);
@@ -855,7 +850,6 @@ void generator::visit_atomic_cas_inst(ir::atomic_cas_inst* cas) {
  * \brief Code Generation for `atomic_exch`
  */
 void generator::visit_atomic_exch_inst(ir::atomic_exch_inst* xchg) {
-  std::cout << "generator::visit_atomic_exch_inst" << std::endl;
   BasicBlock *current = builder_->GetInsertBlock();
   Module *module = current->getModule();
   Value *rmw_ptr = vals_[xchg->get_operand(0)][{}];
@@ -965,7 +959,6 @@ void generator::visit_atomic_rmw_inst(ir::atomic_rmw_inst *atom) {
  */
 //TODO: clean-up
 void generator::visit_mma884(ir::dot_inst* C, ir::value *A, ir::value *B, ir::value *D, unsigned NK) {
-  std::cout << "generator::visit_mma884" << std::endl;
   // shapes
   auto shape_c = C->get_type()->get_block_shapes();
   auto shape_a = A->get_type()->get_block_shapes();
@@ -1512,7 +1505,6 @@ void generator::visit_fmadot(ir::dot_inst* C, ir::value* A, ir::value* B, ir::va
  * Dispatches to appropriate specialized function
  */
 void generator::visit_dot_inst(ir::dot_inst* dot) {
-  std::cout << "generator::visit_dot_inst" << std::endl;  
   Function *fn = builder_->GetInsertBlock()->getParent();
   Module *module = fn->getParent();
   ir::value *A = dot->get_operand(0);
@@ -1525,9 +1517,9 @@ void generator::visit_dot_inst(ir::dot_inst* dot) {
   unsigned NK = A_shapes[red_axis];
   bool is_outer = NK == 1;
   bool is_mma = layouts_->get(dot)->to_mma();
-  if(!is_outer && is_mma && false)
+  if(!is_outer && is_mma && tgt_->as_nvidia()->sm() < 80)
     return visit_mma884(dot, A, B, D, NK);
-  if(!is_outer && is_mma && false)
+  if(!is_outer && is_mma && tgt_->as_nvidia()->sm() >= 80)
     return visit_mma16816(dot, A, B, D, NK);
   return visit_fmadot(dot, A, B, D, NK, c_ty, f_mul_add);
 }
@@ -1564,7 +1556,6 @@ Value* generator::shared_off(const std::vector<unsigned>& shapes, const std::vec
  * \brief Code Generation for `reduce` (1D case)
  */
 void generator::visit_reduce1d_inst(ir::reduce_inst* x, std::function<Value*(Value*,Value*)> do_acc, Value *neutral) {
-  std::cout << "generator::visit_reduce1d_inst" << std::endl;
   std::map<indices_t, Value*> partial;
   ir::value *arg = x->get_operand(0);
   Type *ret_ty = cvt(x->get_type()->get_scalar_ty());
@@ -1619,7 +1610,6 @@ void generator::visit_reduce1d_inst(ir::reduce_inst* x, std::function<Value*(Val
  * \brief Code Generation for `reduce` (ND case)
  */
 void generator::visit_reducend_inst(ir::reduce_inst* x, std::function<Value*(Value*,Value*)> do_acc, Value *neutral) {
-  std::cout << "generator::visit_reducend_inst" << std::endl;
   ir::value *arg = x->get_operand(0);
   Type *ty = cvt(x->get_type()->get_scalar_ty());
   unsigned axis = x->get_axis();
@@ -1781,7 +1771,6 @@ void generator::visit_recoalesce_inst(ir::recoalesce_inst* rc) {
 }
 
 void generator::visit_masked_load_async_inst(ir::masked_load_async_inst* x){
-  std::cout << "generator::visit_masked_load_async_inst" << std::endl;
   unsigned in_vec = 1;
   ir::value *arg = x->get_pointer_operand();
   analysis::shared_layout* out_layout = layouts_->get(x)->to_shared();
@@ -1867,7 +1856,6 @@ void generator::visit_masked_load_async_inst(ir::masked_load_async_inst* x){
 }
 
 void generator::visit_copy_to_shared_inst(ir::copy_to_shared_inst* cts) {
-  std::cout << "generator::visit_copy_to_shared_inst" << std::endl;
   unsigned in_vec = 1;
   ir::value *arg = cts->get_operand(0);
   analysis::shared_layout* out_layout = layouts_->get(cts)->to_shared();
@@ -2052,19 +2040,18 @@ void generator::visit_alloc_const(ir::alloc_const *alloc) {
 
 
 void generator::visit_function(ir::function* fn) {
-  std::cout << "generator::visit_function: " << std::endl;
   LLVMContext &ctx = builder_->getContext();
   FunctionType *fn_ty = (FunctionType*)cvt(fn->get_fn_type());
-  // if(!tgt_->is_gpu()){
-  //   Type *fn_ret_ty = fn_ty->getReturnType();
-  //   std::vector<Type*> fn_args_ty;
-  //   for(unsigned i = 0; i < fn_ty->getNumParams(); i++)
-  //     fn_args_ty.push_back(fn_ty->getParamType(i));
-  //   fn_args_ty.push_back(i32_ty);
-  //   fn_args_ty.push_back(i32_ty);
-  //   fn_args_ty.push_back(i32_ty);
-  //   fn_ty = FunctionType::get(fn_ret_ty, fn_args_ty, false);
-  // }
+  if(!tgt_->is_gpu()){
+    Type *fn_ret_ty = fn_ty->getReturnType();
+    std::vector<Type*> fn_args_ty;
+    for(unsigned i = 0; i < fn_ty->getNumParams(); i++)
+      fn_args_ty.push_back(fn_ty->getParamType(i));
+    fn_args_ty.push_back(i32_ty);
+    fn_args_ty.push_back(i32_ty);
+    fn_args_ty.push_back(i32_ty);
+    fn_ty = FunctionType::get(fn_ret_ty, fn_args_ty, false);
+  }
   Function *ret = Function::Create(fn_ty, Function::ExternalLinkage, fn->get_name(), mod_);
   // set attributes
   for(auto attr_pair: fn->attrs()){
@@ -2076,16 +2063,16 @@ void generator::visit_function(ir::function* fn) {
         ret->addAttribute(id, cvt(attr));
     }
   }
-  // // set metadata
-  // if(tgt_->is_gpu()){
-  //     tgt_->set_kernel(*builder_, ctx, mod_, ret);
-  //     Metadata *md_args[] = {
-  //       ValueAsMetadata::get(ret),
-  //       MDString::get(ctx, "maxntidx"),
-  //       ValueAsMetadata::get(i32(num_warps_*32))
-  //     };
-  //     mod_->getOrInsertNamedMetadata("nvvm.annotations")->addOperand(MDNode::get(ctx, md_args));
-  // }
+  // set metadata
+  if(tgt_->is_gpu()){
+      tgt_->set_kernel(*builder_, ctx, mod_, ret);
+      Metadata *md_args[] = {
+        ValueAsMetadata::get(ret),
+        MDString::get(ctx, "maxntidx"),
+        ValueAsMetadata::get(i32(num_warps_*32))
+      };
+      mod_->getOrInsertNamedMetadata("nvvm.annotations")->addOperand(MDNode::get(ctx, md_args));
+  }
   // set arguments
   for(unsigned i = 0; i < fn->args().size(); i++)
     vals_[fn->args()[i]][{}] = &*(ret->arg_begin() + i);
@@ -2109,7 +2096,6 @@ void generator::visit_function(ir::function* fn) {
 
 
 void generator::visit_layout_mma(analysis::mma_layout* layout) {
-  std::cout << "generator::visit_layout_mma" << std::endl;
   ir::value *a = nullptr;
   ir::value *b = nullptr;
   for(ir::value* v: layout->get_values())
@@ -2128,7 +2114,7 @@ void generator::visit_layout_mma(analysis::mma_layout* layout) {
   Value *_8 = i32(8);
   Value *_16 = i32(16);
   Value *_32 = i32(32);
-  // int cc = tgt_->as_nvidia()->sm();
+  int cc = tgt_->as_nvidia()->sm();
   std::vector<Value*> idx_m;
   std::vector<Value*> idx_n;
   std::vector<Value*> idx_z;
@@ -2137,7 +2123,7 @@ void generator::visit_layout_mma(analysis::mma_layout* layout) {
   Value *lane = urem(thread, _32);
   Value *warp = udiv(thread, _32);
   /* lane offset */
-  if(true){
+  if(cc < 80){
     auto ord_a = layout_a->get_order();
     auto ord_b = layout_b->get_order();
     bool is_a_row = ord_a[0] != 0;
@@ -2296,7 +2282,6 @@ void generator::visit_layout_shared(analysis::shared_layout* layout) {
 }
 
 void generator::visit_basic_block(ir::basic_block * block) {
-  std::cout << "generator::visit_basic_block" << std::endl;
   BasicBlock *parent = bbs_[block];
   builder_->SetInsertPoint(parent);
   for(ir::instruction *i: block->get_inst_list()){
@@ -2307,11 +2292,10 @@ void generator::visit_basic_block(ir::basic_block * block) {
 }
 
 void generator::visit_argument(ir::argument* arg) {
-  std::cout << "generator::visit_argument" << std::endl;
+
 }
 
 void generator::init_idx(ir::value *v) {
-  std::cout << "generator::init_idx" << std::endl;
   idxs_[v].clear();
   if(!v->get_type()->is_block_ty()){
     idxs_[v].push_back({});
@@ -2374,7 +2358,6 @@ void generator::init_idx(ir::value *v) {
 }
 
 void generator::finalize_shared_layout(analysis::shared_layout *shared) {
-  std::cout << "generator::finalize_shared_layout" << std::endl;
   if(shared->get_double_buffer()) {
     auto info = *shared->get_double_buffer();
     ir::phi_node *phi = info.phi;
@@ -2399,7 +2382,6 @@ void generator::finalize_shared_layout(analysis::shared_layout *shared) {
 }
 
 void generator::finalize_function(ir::function *fn) {
-  std::cout << "generator::finalize_function" << std::endl;
   // finalize double-buffering
   for(const auto& x: layouts_->get_all())
   if(auto *shared = dynamic_cast<analysis::shared_layout*>(x.second))
@@ -2414,7 +2396,6 @@ void generator::finalize_function(ir::function *fn) {
 }
 
 void generator::finalize_phi_node(ir::phi_node *x) {
-  std::cout << "generator::finalize_phi_node" << std::endl;
   if(shmems_.find(x) != shmems_.end())
     return;
   for(unsigned n = 0; n < x->get_num_incoming(); n++){
@@ -2429,12 +2410,11 @@ void generator::finalize_phi_node(ir::phi_node *x) {
 }
 
 void generator::visit(ir::module &src, llvm::Module &dst) {
-  std::cout << "generator::visit" << std::endl;
   mod_ = &dst;
   ctx_ = &dst.getContext();
   builder_ = new Builder(*ctx_);
   // allocate shared memory
-  // if(tgt_->is_gpu())
+  if(tgt_->is_gpu())
   if(unsigned alloc_size = alloc_->allocated_size()){
     Type *int_8_ty = Type::getInt8Ty(*ctx_);
     Type *int_32_ty = Type::getInt32Ty(*ctx_);

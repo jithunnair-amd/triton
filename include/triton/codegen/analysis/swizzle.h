@@ -2,7 +2,6 @@
 #define TRITON_INCLUDE_IR_CODEGEN_SWIZZLE_H
 
 #include <map>
-#include <iostream>
 
 namespace triton{
 
@@ -23,20 +22,9 @@ public:
   // constructor
   swizzle(layouts *l, target* tgt): layouts_(l), tgt_(tgt){ }
   // accessors
-  int get_per_phase(data_layout* layout) {
-    std::cout << "swizzle::get_per_phase" << std::endl;
-    return per_phase_.at(layout);
-  }
-  int get_max_phase(data_layout *layout)
-  {
-    std::cout << "swizzle::get_max_phase" << std::endl;
-    return max_phase_.at(layout);
-  }
-  int get_vec(data_layout *layout)
-  {
-    std::cout << "swizzle::get_vec" << std::endl;
-    return vec_.at(layout);
-  }
+  int get_per_phase(data_layout* layout) { return per_phase_.at(layout); }
+  int get_max_phase(data_layout* layout) { return max_phase_.at(layout); }
+  int get_vec  (data_layout* layout)     { return vec_.at(layout); }
   // run
   void run(ir::module &mod);
 private:
