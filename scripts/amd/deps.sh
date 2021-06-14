@@ -1,2 +1,2 @@
 sudo apt update
-sudo apt install libtinfo-dev
+sudo apt install libtinfo-dev gdb

@@ -41,9 +41,7 @@ def add(x, y):
     # running asynchronously.
     return z
 
-
-if __name__ == "__main__":
-    # execute only if run as a script
+def test_op():
     torch.manual_seed(0)
     size = 98432
     x = torch.rand(size, device='cuda')
@@ -54,3 +52,8 @@ if __name__ == "__main__":
     print(zb)
     print(
         f'The maximum difference between torch and triton is ' f'{torch.max(torch.abs(za - zb))}')
+
+
+if __name__ == "__main__":
+    # execute only if run as a script
+    test_op()
