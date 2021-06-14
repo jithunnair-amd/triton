@@ -92,10 +92,6 @@ namespace driver
 
 
 bool dispatch::cuinit(){
-  std::cout << "dispatch::cuinit" << std::endl;
-  std::string libcuda = tools::getenv("TRITON_LIBCUDA");
-  std::cout << "libcuda: " << libcuda << std::endl;
-  
   if(cuda_==nullptr){
     putenv((char*)"CUDA_CACHE_DISABLE=1");
     std::string libcuda = tools::getenv("TRITON_LIBCUDA");
