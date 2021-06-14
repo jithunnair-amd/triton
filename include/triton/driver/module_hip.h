@@ -22,7 +22,7 @@ namespace triton
 namespace driver
 {
 
-class cu_context;
+class hip_context;
 class hip_device;
 
 // Base
@@ -59,19 +59,21 @@ public:
 };
 
 // CUDA
-class cu_module: public module {
-  std::string compile_llvm_module(std::unique_ptr<llvm::Module> module, driver::device* device);
-  void init_from_ptx(const std::string& ptx);
+class hip_module: public module {
+  std::string compile_llvm_module(llvm::Module* module, driver::device* device);
+  void init_from_ptx(const std::string& ptx, hip_device *device);
 
 public:
-  cu_module(driver::device* device, std::unique_ptr<llvm::Module> module);
-  cu_module(driver::device* device, const std::string& source);
+  hip_module(driver::device* device, std::unique_ptr<llvm::Module> module);
+  hip_module(driver::device* device, const std::string& source);
   std::unique_ptr<buffer> symbol(const char * name) const;
   std::string llir() const { return llir_; }
   const std::string& ptx() const { return ptx_; }
+  const std::string& cubin() const { return cubin_; }
 
 private:
   std::string ptx_;
+  std::string cubin_;
   std::string llir_;
 };
 

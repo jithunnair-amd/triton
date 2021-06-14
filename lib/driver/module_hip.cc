@@ -24,8 +24,6 @@
 #include <unistd.h>
 #include <memory>
 #include <regex>
-#include <iostream>
-#include <sstream>
 #include "triton/driver/module_hip.h"
 #include "triton/driver/context_hip.h"
 #include "triton/driver/error_hip.h"
@@ -49,6 +47,7 @@
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "helper.h"
 
 std::string exec(const char* cmd) {
     std::array<char, 128> buffer;
@@ -97,7 +96,7 @@ module::module(host_module_t mod, bool has_ownership)
 module* module::create(driver::device* device, std::unique_ptr<llvm::Module> src) {
   std::cout << "module_hip::create" << std::endl;
   switch(device->backend()){
-    case CUDA: return new cu_module(device, std::move(src));
+    case CUDA: return new hip_module(device, std::move(src));
     case Host: return new host_module(std::move(src));
     default: throw std::runtime_error("unknown backend");
   }
@@ -216,98 +215,12 @@ static std::map<int, int> vptx = {
   {10020, 65},
   {11000, 70},
   {11010, 71},
-  {11020, 72}
+  {11020, 72},
+  {11030, 73},
 };
 
-template <typename T>
-std::string str_join(const T &v, const std::string &delim)
-{
-  std::ostringstream s;
-  for (const auto &i : v)
-  {
-    if (&i != &v[0])
-    {
-      s << delim;
-    }
-    s << i;
-  }
-  return s.str();
-}
-
-std::vector<std::string> str_split(const std::string &str, const std::string &delim)
-{
-  std::vector<std::string> tokens;
-  size_t prev = 0, pos = 0;
-  do
-  {
-    pos = str.find(delim, prev);
-    if (pos == std::string::npos)
-      pos = str.length();
-    std::string token = str.substr(prev, pos - prev);
-    if (!token.empty())
-      tokens.push_back(token);
-    prev = pos + delim.length();
-  } while (pos < str.length() && prev < str.length());
-  return tokens;
-}
-
-#define TF_ROCM_VERSION 42000
-std::string MapGCNArchNameTokenToFeatureStr(const std::string& token) {
-  if (token == "sramecc+") {
-    return "+sramecc";
-  } else if (token == "sramecc-") {
-#if TF_ROCM_VERSION < 40100
-    return "";
-#else
-    return "-sramecc";
-#endif
-  } else if (token == "xnack+") {
-    return "+xnack";
-  } else if (token == "xnack-") {
-    return "-xnack";
-  }
-  return "";
-
-}
-
-std::pair<std::string, std::string> GetFeatureStrFromGCNArchName(
-    const std::string& gcn_arch_name) {
-  std::string feature_str;
-  std::string gfx = gcn_arch_name;
-#if TF_ROCM_VERSION < 30900
-  // For ROCm versions older than 3.9, hardcode it to "+code-object-v3"
-  // This is simply to preserve how things were...nohing else
-  feature_str = "+code-object-v3";
-#elif TF_ROCM_VERSION < 40000
-  // For ROCM versions 3.9 and 3.10, hardcode it to empty string
-  feature_str = "";
-#else
-  // For ROCm versions 4.0 and greater, we need to specify the correct
-  // feature str, based on the underlying GPU HW to get max performance.
-  // std::vector<std::string> tokens = absl::StrSplit(gcn_arch_name, ':');
-  std::vector<std::string> tokens = str_split(gcn_arch_name, ":");
-  std::vector<std::string> mapped_tokens;
-  if(tokens.size()>0)
-    gfx=tokens[0];
-  for (auto it = tokens.begin(); it != tokens.end(); it++) {
-    // Skip the first token, that is the gfxNNN str
-    // The rest of the tokens are the feature/targetid strings
-    if (it != tokens.begin()) {
-      std::string token(*it);
-      std::string mapped_token = MapGCNArchNameTokenToFeatureStr(token);
-      mapped_tokens.push_back(mapped_token);
-    }
-  }
-  // feature_str = absl::StrJoin(mapped_tokens, ",");
-  feature_str = str_join(mapped_tokens, ",");
-  std::cout << "feature_str: " << feature_str << std::endl;
-#endif
-
-  return make_pair(gfx, feature_str);
-}
-
-std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module, driver::device* device) {
-  std::cout << "cu_module::compile_llvm_module" << std::endl;
+std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device* device) {
+  std::cout << "hip_module::compile_llvm_module" << std::endl;
 #if 0
   // LLVM version in use may not officially support target hardware
   int max_nvvm_cc = 75;
@@ -424,48 +337,37 @@ std::string cu_module::compile_llvm_module(std::unique_ptr<llvm::Module> module,
   return result;
 }
 
-void cu_module::init_from_ptx(const std::string& ptx) {
-  std::cout << "cu_module::init_from_ptx" << std::endl;
+void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* device) {
+  std::cout << "hip_module::init_from_ptx" << std::endl;
   // JIT compile source-code
 //  std::cout << ptx << std::endl;
 
   try{
-//    // compile ptx with ptxas
-//    char _fsrc[] = "/tmp/triton_k_XXXXXX";
-//    char _flog[] = "/tmp/triton_l_XXXXXX";
-//    int fdsrc = mkstemp(_fsrc);
-//    int fdlog = mkstemp(_flog);
-//    std::string fsrc = _fsrc;
-//    std::string flog = _flog;
-//    std::ofstream ofs(fsrc);
-//    ofs << ptx;
-//    ofs.close();
-//    std::string cmd;
-//    int err;
-//    driver::hip_device* hip_device = (driver::hip_device*)device;
-//    cmd = "ptxas -v --gpu-name=sm_" + std::to_string(hip_device->compute_capability()) + " " + fsrc + " -o " + fsrc + ".o 2> " + flog;
-//    err = system(cmd.c_str());
-//    dispatch::hipModuleLoad(&*cu_, (fsrc + ".o").c_str());
-//    std::ifstream file(flog);
-//    std::string log;
-//    if(file)
-//      while (!file.eof()) log.push_back(file.get());
-//    unlink(_fsrc);
-//    unlink(_flog);
+    std::string ptxas = tools::getenv("TRITON_PTXAS");
 
-//    std::smatch match;
-//    std::regex expr ("\\b([0-9]+) bytes spill");
-//    spilled_ = 0;
-//    while (std::regex_search (log,match,expr)){
-//      spilled_ += std::stoi(match[1]);
-//      log = match.suffix();
-//    }
-//    std::cout << log << std::endl;
-    // std::ifstream t("ptx.cu");
-    // std::string ptx_cu((std::istreambuf_iterator<char>(t)),
-    //              std::istreambuf_iterator<char>());
+    // Use PTXAS via system call
+    if(!ptxas.empty()){
+      // compile ptx with ptxas
+      char _fsrc[] = "/tmp/triton_k_XXXXXX";
+      char _flog[] = "/tmp/triton_l_XXXXXX";
+      mkstemp(_fsrc);
+      mkstemp(_flog);
+      std::string fsrc = _fsrc;
+      std::string flog = _flog;
+      std::ofstream ofs(fsrc);
+      ofs << ptx;
+      ofs.close();
+      std::string cmd;
+      int err;
+      std::string cc = std::to_string(device->compute_capability());
+      cmd = "ptxas -v --gpu-name=sm_" + cc + " " + fsrc + " -o " + fsrc + ".o 2> " + flog;
+      err = system(cmd.c_str());
+      dispatch::hipModuleLoad(&*cu_, (fsrc + ".o").c_str());
+      unlink(_fsrc);
+      unlink(_flog);
+      return;
+    }
 
-    // ptx_ = ptx_cu;
 
     hipJitOption opt[] = {hipJitOptionErrorLogBufferSizeBytes, hipJitOptionErrorLogBuffer,
                           hipJitOptionInfoLogBufferSizeBytes, hipJitOptionInfoLogBuffer,
@@ -476,15 +378,6 @@ void cu_module::init_from_ptx(const std::string& ptx) {
     char _log[logbufsize];
     void* optval[] = {(void*)(uintptr_t)errbufsize, (void*)_err, (void*)(uintptr_t)logbufsize, (void*)_log, (void*)1};
     dispatch::hipModuleLoadDataEx(&*cu_, ptx_.data(), 5, opt, optval);
-    std::string err(_err);
-    std::string log(_log);
-//    std::smatch match;
-//    std::regex expr ("\\b([0-9]+) bytes spill");
-//    spilled_ = 0;
-//    while (std::regex_search(log,match,expr)){
-//      spilled_ += std::stoi(match[1]);
-//      log = match.suffix();
-//    }
   }
   catch(exception::cuda::invalid_ptx const &){
 //#ifdef TRITON_LOG_PTX_ERROR
@@ -499,51 +392,22 @@ void cu_module::init_from_ptx(const std::string& ptx) {
   }
 }
 
-cu_module::cu_module(driver::device* device, std::unique_ptr<llvm::Module> ll_module): module(hipModule_t(), true) {
-  std::cout << "cu_module::cu_module" << std::endl;
+hip_module::hip_module(driver::device* device, std::unique_ptr<llvm::Module> ll_module): module(hipModule_t(), true) {
+  std::cout << "hip_module::hip_module" << std::endl;
   llvm::raw_string_ostream oss(llir_);
   oss << *ll_module;
   oss.flush();
-  std::string cache_path = tools::getenv("TRITON_DEBUG_CACHE_PATH");
-  if (cache_path.empty())
-  {
-    std::cout << "cu_module::cu_module: cache_path empty" << std::endl;
-    ptx_ = compile_llvm_module(std::move(ll_module), device);
-  }
-  else
-  {
-    std::cout << "cu_module::cu_module: cache_path not empty" << std::endl;
-    tools::mkdir(cache_path);
-    // update cache path to PTX file
-    unsigned char hash[20];
-    sha1::calc((void*)llir_.data(), llir_.size(), hash);
-    char _hex[40];
-    sha1::toHexString(hash, _hex);
-    std::string hex(_hex, _hex + 40);
-    cache_path += "/" + hex;
-    // read
-    std::ifstream ifs(cache_path);
-    std::ostringstream _ptx;
-    if(ifs)
-      _ptx << ifs.rdbuf();
-    ptx_ = _ptx.str();
-    // compile and write-back if read empty
-    if(ptx_.empty()){
-      ptx_ = compile_llvm_module(std::move(ll_module), device);
-      std::ofstream ofs(cache_path);
-      ofs << ptx_;
-    }
-  }
-  init_from_ptx(ptx_);
+  ptx_ = compile_llvm_module(ll_module.get(), device);
+  init_from_ptx(ptx_, (driver::hip_device*)device);
 }
 
-cu_module::cu_module(driver::device*, std::string const & source) : module(hipModule_t(), true), ptx_(source){
-  std::cout << "cu_module::cu_module" << std::endl;
-  init_from_ptx(ptx_);
+hip_module::hip_module(driver::device* device, std::string const & source) : module(hipModule_t(), true), ptx_(source){
+  std::cout << "hip_module::hip_module" << std::endl;
+  init_from_ptx(ptx_, (driver::hip_device*)device);
 }
 
-std::unique_ptr<buffer> cu_module::symbol(const char *name) const{
-  std::cout << "cu_module::symbol" << std::endl;
+std::unique_ptr<buffer> hip_module::symbol(const char *name) const{
+  std::cout << "hip_module::symbol" << std::endl;
   hipDeviceptr_t handle;
   size_t size;
   dispatch::hipModuleGetGlobal(&handle, &size, *cu_, name);
