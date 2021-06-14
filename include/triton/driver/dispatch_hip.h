@@ -10,9 +10,6 @@
 //HIP Backend
 #define __HIP_PLATFORM_HCC__
 #include "hip/hip_runtime.h"
-
-
-// #include "triton/external/CUDA/hip.h"
 #include "triton/external/CUDA/nvml_hip.h"
 
 //Exceptions
@@ -50,21 +47,15 @@ protected:
   static typename return_type<FunPtrT>::type f_impl(void*& lib_h, FunPtrT, void*& cache, const char * name, Args... args)
   {
     std::cout << "f_impl: " << name << std::endl;
-    initializer(); // cuinit
-    // std::cout << "f_impl: after cuinit"<< std::endl;
-
+    initializer();
     if(cache == nullptr){
-      // std::cout << "f_impl: cache empty"<< std::endl;
       cache = dlsym(lib_h, name);
-			if(cache == 0){
-        std::cout << "dlsym cannot find " << name << std::endl;
-        throw std::runtime_error("dlsym unable to load HIP function");
-      }
-    }
+			if(cache == 0)
+				throw std::runtime_error("dlsym unable to load HIP function");
+		}
     FunPtrT fptr;
     *reinterpret_cast<void **>(&fptr) = cache;
     typename return_type<FunPtrT>::type res = (*fptr)(args...);
-    // std::cout << "f_impl:res " << res << std::endl;
     check(res);
     return res;
   }
@@ -95,6 +86,12 @@ public:
   static hipError_t hipModuleLaunchKernel(hipFunction_t f, unsigned int gridDimX, unsigned int gridDimY, unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY, unsigned int blockDimZ, unsigned int sharedMemBytes, hipStream_t hStream, void **kernelParams, void **extra);
   static hipError_t hipModuleUnload(hipModule_t hmod);
   static hipError_t hipModuleLoadDataEx(hipModule_t *module, const void *image, unsigned int numOptions, hipJitOption *options, void **optionValues);
+ 
+  // static CUresult cuLinkAddData_v2(CUlinkState state, CUjitInputType type, void* data, size_t size, const char* name, unsigned int numOptions, CUjit_option* options, void** optionValues);
+  // static CUresult cuLinkCreate_v2(unsigned int  numOptions, CUjit_option* options, void** optionValues, CUlinkState* stateOut);
+  // static CUresult cuLinkComplete(CUlinkState state, void** cubinOut, size_t* sizeOut);
+  // static CUresult cuLinkDestroy(CUlinkState state);
+
   static hipError_t hipDeviceGetAttribute(int *pi, hipDeviceAttribute_t attrib, int dev);
   static hipError_t hipGetDeviceCount(int *count);
   static hipError_t hipMemcpyHtoD(hipDeviceptr_t dstDevice, const void *srcHost, size_t ByteCount);
