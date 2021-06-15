@@ -533,7 +533,10 @@ class Kernel:
             if node is None or isinstance(e, (NotImplementedError, CompilationError)):
                 raise e
             raise CompilationError(self.fn.src, node, e)
-        tt_device = _triton.driver.cu_device(device.index, False)
+        if torch.version.hip is not None:
+            tt_device = _triton.driver.hip_device(device.index, False)
+        else:
+            tt_device = _triton.driver.cu_device(device.index, False)
         # Compile to machine code
         mod, ker, shared_mem, ir_asm = _triton.code_gen.add_passes_to_emit_bin(generator.module, tt_device, num_warps)
         return Binary(mod, ker, num_warps, shared_mem, ir_asm)
