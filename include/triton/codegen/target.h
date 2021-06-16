@@ -79,7 +79,7 @@ public:
   Value* get_local_id(Module *module, Builder& builder, unsigned ax);
   Value* get_block_id(Module *module, Builder& builder, unsigned ax);
   Value* get_num_blocks(Module *module, Builder& builder, unsigned ax);
-  int sm() { return sm_; }
+  int sm() { return 1; }
   unsigned guaranteed_alignment() { return 16; }
 
 private:
