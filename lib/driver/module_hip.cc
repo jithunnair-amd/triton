@@ -318,8 +318,8 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
       new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::OF_Text));
   std::cout << "isabin_fs error code: " << ec << std::endl;
 
-  // llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
-  // pass.add(p);
+  llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
+  pass.add(p);
 
   // emit
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CGFT_ObjectFile);

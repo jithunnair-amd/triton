@@ -13,16 +13,36 @@
 #include "triton/codegen/transform/peephole.h"
 #include "triton/codegen/transform/pipeline.h"
 #include "triton/codegen/transform/prefetch.h"
-#include "triton/driver/device.h"
-#include "triton/driver/kernel.h"
-#include "triton/driver/module.h"
+#include "triton/driver/device_hip.h"
+#include "triton/driver/kernel_hip.h"
+#include "triton/driver/module_hip.h"
 #include "triton/ir/function.h"
 #include "triton/ir/module.h"
 #include "triton/ir/print.h"
 #include "llvm/IR/Module.h"
+#include <fstream>
 
 namespace triton {
 namespace codegen {
+
+  void print_ir(ir::module ir_ref, std::string name)
+  {
+    std::ofstream ir_out(name);
+    ir_out.flush();
+    ir::print(ir_ref, ir_out);
+    ir_out.close();
+  }
+
+  void print_llvm_ir(llvm::Module& llvm_module, std::string suffix)
+  {
+    // Dump LLVM IR.
+    std::string ir_path = llvm_module.getModuleIdentifier() + suffix + std::string(".ir");
+    std::error_code ec;
+    std::unique_ptr<llvm::raw_fd_ostream> ir_fs(
+        new llvm::raw_fd_ostream(ir_path, ec, llvm::sys::fs::OF_None));
+    llvm_module.print(*ir_fs, nullptr);
+    ir_fs->flush();
+  }
 
 // TODO:
 // There should be a proper pass manager there!
@@ -94,7 +114,9 @@ void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
   prefetch_s.run(ir);
   barriers.run(ir);
   // ir::print(ir, std::cout);
+  print_ir(ir, "_add_before_visit.ir");
   isel.visit(ir, *llvm);
+  print_llvm_ir(*llvm, "_after_visit_llvm");
   mod = driver::module::create(dev, std::move(llvm));
   ker = driver::kernel::create(&*mod, name.c_str());
   shared_mem = allocation.allocated_size();
