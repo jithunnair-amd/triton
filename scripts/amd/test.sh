@@ -8,8 +8,9 @@ export TRITON_LIBHIP=/opt/rocm/lib/libamdhip64.so
 # pytest --verbose python/test/test_blocksparse.py::test_attention_fwd_bwd
 # python python/test/test_conv.py
 
-gdb -ex "set breakpoint pending on" \
-    -ex 'break visit_fmadot' \
-    --args python python/test/test_add.py
+# gdb -ex "set breakpoint pending on" \
+#     -ex 'break generator.cc:537' \
+#     --args python python/test/test_add.py
 
+python python/test/test_add.py
     # -ex 'ignore 1 472' \

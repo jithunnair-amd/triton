@@ -1,5 +1,7 @@
 set -x
-rm -f conv.o
+rm -rf *.asm
+rm -rf *.ir
+rm -rf *.o
 rm -rf python/build/
 rm -rf python/test/__pycache__/
 rm -rf python/triton.egg-info/
