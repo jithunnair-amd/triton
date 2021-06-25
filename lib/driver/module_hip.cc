@@ -303,25 +303,32 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
 
   // create dump files
   std::string module_name = module->getModuleIdentifier();
-  std::string ir_path = module_name + std::string(".ir");
-  std::string isabin_path = module_name + std::string(".o");
   std::error_code ec;
 
   // Dump LLVM IR.
+  std::string ir_path = module_name + std::string(".ir");
   std::unique_ptr<llvm::raw_fd_ostream> ir_fs(
       new llvm::raw_fd_ostream(ir_path, ec, llvm::sys::fs::OF_None));
   module->print(*ir_fs, nullptr);
   ir_fs->flush();
 
   // Emit GCN ISA binary.
+  std::string isabin_path = module_name + std::string(".o");
   std::unique_ptr<llvm::raw_fd_ostream> isabin_fs(
       new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::OF_Text));
   std::cout << "isabin_fs error code: " << ec << std::endl;
+
+  // Emit GCN ISA Assembly.
+  std::string isaasm_path = module_name + std::string(".asm");
+  std::unique_ptr<llvm::raw_fd_ostream> isaasm_fs(
+      new llvm::raw_fd_ostream(isaasm_path, ec, llvm::sys::fs::OF_None));
+  std::cout << "isaasm_fs error code: " << ec << std::endl;
 
   llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
   pass.add(p);
 
   // emit
+  // machine->addPassesToEmitFile(pass, *isaasm_fs, nullptr, llvm::CGFT_AssemblyFile);
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CGFT_ObjectFile);
   pass.run(*module);
   isabin_fs->flush();
