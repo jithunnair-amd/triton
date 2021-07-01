@@ -20,6 +20,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "print_ir.h"
 
 namespace triton{
 namespace codegen{
@@ -210,6 +211,7 @@ generator::generator(analysis::axes *a_axes,
  */
 void generator::visit_value(ir::value* v) {
   std::cout << "generator::visit_value" << std::endl;
+  print_llvm_ir_tracked(*mod_, "visit_value");
   if(!seen_.insert(v).second)
     return;
   if(v->get_type()->is_block_ty()){
@@ -235,7 +237,8 @@ void generator::visit_value(ir::value* v) {
   if(inst)
     for(ir::value *op: inst->ops()){
       if(dynamic_cast<ir::constant*>(op) || !dynamic_cast<ir::phi_node*>(v)){
-        std::cout << op->get_name() << std::endl;
+        std::cout << "inst: " << inst->get_name() << std::endl;
+        std::cout <<"operands: "<< op->get_name() << std::endl;
         visit_value(op);
       }
     }
@@ -533,6 +536,7 @@ void generator::visit_uncond_branch_inst(ir::uncond_branch_inst* br) {
  * \brief Code Generation for a (synchronous) `load`
  */
 void generator::visit_load_inst(ir::load_inst* x){
+  std::cout << "generator::visit_load_inst" << std::endl;
   ir::value *op = x->get_pointer_operand();
   ir::masked_load_inst *mx = dynamic_cast<ir::masked_load_inst*>(x);
   Type* ty  = cvt(op->get_type()->get_scalar_ty()->get_pointer_element_ty());
@@ -2040,6 +2044,7 @@ void generator::visit_alloc_const(ir::alloc_const *alloc) {
 
 
 void generator::visit_function(ir::function* fn) {
+  std::cout << "generator::visit_function" << std::endl;
   LLVMContext &ctx = builder_->getContext();
   FunctionType *fn_ty = (FunctionType*)cvt(fn->get_fn_type());
   if(!tgt_->is_gpu()){
@@ -2052,6 +2057,7 @@ void generator::visit_function(ir::function* fn) {
     fn_args_ty.push_back(i32_ty);
     fn_ty = FunctionType::get(fn_ret_ty, fn_args_ty, false);
   }
+  std::cout << "fn_name: " << fn->get_name() << std::endl;
   Function *ret = Function::Create(fn_ty, Function::ExternalLinkage, fn->get_name(), mod_);
   // set attributes
   for(auto attr_pair: fn->attrs()){
@@ -2078,6 +2084,7 @@ void generator::visit_function(ir::function* fn) {
     vals_[fn->args()[i]][{}] = &*(ret->arg_begin() + i);
   // create blocks
   for(ir::basic_block *block: fn->blocks()) {
+    std::cout << "block_name: " << block->get_name() << std::endl;
     BasicBlock *dst_block = BasicBlock::Create(ctx, block->get_name(), ret);
     bbs_[block] = dst_block;
   }
@@ -2091,6 +2098,9 @@ void generator::visit_function(ir::function* fn) {
     visit_basic_block(block);
   // finalize
   finalize_function(fn);
+
+  // verifyFunction
+  llvm::verifyFunction(*ret);
 }
 
 
@@ -2282,6 +2292,7 @@ void generator::visit_layout_shared(analysis::shared_layout* layout) {
 }
 
 void generator::visit_basic_block(ir::basic_block * block) {
+  std::cout << "generator::visit_basic_block" << std::endl;
   BasicBlock *parent = bbs_[block];
   builder_->SetInsertPoint(parent);
   for(ir::instruction *i: block->get_inst_list()){

@@ -21,37 +21,21 @@
 #include "triton/ir/print.h"
 #include "llvm/IR/Module.h"
 #include <fstream>
+#include "print_ir.h"
 
 namespace triton {
 namespace codegen {
-
-  void print_ir(ir::module ir_ref, std::string name)
-  {
-    std::ofstream ir_out(name);
-    ir_out.flush();
-    ir::print(ir_ref, ir_out);
-    ir_out.close();
-  }
-
-  void print_llvm_ir(llvm::Module& llvm_module, std::string suffix)
-  {
-    // Dump LLVM IR.
-    std::string ir_path = llvm_module.getModuleIdentifier() + suffix + std::string(".ir");
-    std::error_code ec;
-    std::unique_ptr<llvm::raw_fd_ostream> ir_fs(
-        new llvm::raw_fd_ostream(ir_path, ec, llvm::sys::fs::OF_None));
-    llvm_module.print(*ir_fs, nullptr);
-    ir_fs->flush();
-  }
 
 // TODO:
 // There should be a proper pass manager there!
 void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
                             driver::module *&mod, driver::kernel *&ker, size_t &shared_mem) {
+  print_triton_ir(ir, "_add_before_passes_triton.ir");
   // generate llvm code
   llvm::LLVMContext ctx;
   std::string name = ir.get_function_list()[0]->get_name();
   std::unique_ptr<llvm::Module> llvm(new llvm::Module(name, ctx));
+  print_llvm_ir(*llvm, "_before_passes_llvm");
   // optimizations
   std::unique_ptr<codegen::target> target = dev->make_target();
   bool cts_use_async = target->as_nvidia()->sm() >= 80;
@@ -114,7 +98,7 @@ void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
   prefetch_s.run(ir);
   barriers.run(ir);
   // ir::print(ir, std::cout);
-  print_ir(ir, "_add_before_visit.ir");
+  print_triton_ir(ir, "_add_before_visit_triton.ir");
   isel.visit(ir, *llvm);
   print_llvm_ir(*llvm, "_after_visit_llvm");
   mod = driver::module::create(dev, std::move(llvm));
