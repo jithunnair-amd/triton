@@ -25,13 +25,7 @@
 #include <fstream>
 #include "triton/ir/print.h"
 
-inline void print_triton_ir(triton::ir::module ir_ref, std::string name)
-{
-    std::ofstream ir_out(name);
-    ir_out.flush();
-    triton::ir::print(ir_ref, ir_out);
-    ir_out.close();
-}
+static int print_count = 0;
 
 inline void print_llvm_ir(llvm::Module &llvm_module, std::string suffix)
 {
@@ -44,7 +38,6 @@ inline void print_llvm_ir(llvm::Module &llvm_module, std::string suffix)
     ir_fs->flush();
 }
 
-static int print_count = 0;
 inline void print_llvm_ir_tracked(llvm::Module &llvm_module, std::string suffix)
 {
     
@@ -57,5 +50,14 @@ inline void print_llvm_ir_tracked(llvm::Module &llvm_module, std::string suffix)
     ir_fs->flush();
     print_count += 1;
 }
+
+inline void print_triton_ir(triton::ir::module ir_ref, std::string name)
+{
+    std::ofstream ir_out(name);
+    ir_out.flush();
+    triton::ir::print(ir_ref, ir_out);
+    ir_out.close();
+}
+
 
 #endif
