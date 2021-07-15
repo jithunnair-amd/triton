@@ -9,8 +9,8 @@ export TRITON_LIBHIP=/opt/rocm/lib/libamdhip64.so
 # python python/test/test_conv.py
 
 # gdb -ex "set breakpoint pending on" \
-#     -ex 'break generator.cc:537' \
+#     -ex 'break add_passes_to_emit_bin' \
 #     --args python python/test/test_add.py
 
-python python/test/test_add.py
+python python/test/test_basic.py
     # -ex 'ignore 1 472' \

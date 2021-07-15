@@ -537,6 +537,7 @@ void generator::visit_uncond_branch_inst(ir::uncond_branch_inst* br) {
  */
 void generator::visit_load_inst(ir::load_inst* x){
   std::cout << "generator::visit_load_inst" << std::endl;
+  print_llvm_ir_tracked(*mod_, "visit_load_inst_before");  
   ir::value *op = x->get_pointer_operand();
   ir::masked_load_inst *mx = dynamic_cast<ir::masked_load_inst*>(x);
   Type* ty  = cvt(op->get_type()->get_scalar_ty()->get_pointer_element_ty());
@@ -666,7 +667,11 @@ void generator::visit_load_inst(ir::load_inst* x){
     int tmp = (width / (dtsize * 8));
     for(size_t ii = 0; ii < vec; ii++)
       vals_[x][idxs[i+ii]] = extract_elt(rets[ii/tmp], ii % tmp);
+
+
+    print_llvm_ir_tracked(*mod_, "visit_load_inst_for_loop_"+ std::to_string(i)); 
   }
+  print_llvm_ir_tracked(*mod_, "visit_load_inst_final");  
 }
 
 void generator::visit_unmasked_load_inst(ir::unmasked_load_inst* x) {
@@ -2072,12 +2077,14 @@ void generator::visit_function(ir::function* fn) {
   // set metadata
   if(tgt_->is_gpu()){
       tgt_->set_kernel(*builder_, ctx, mod_, ret);
+  #if 0
       Metadata *md_args[] = {
         ValueAsMetadata::get(ret),
         MDString::get(ctx, "maxntidx"),
         ValueAsMetadata::get(i32(num_warps_*32))
       };
       mod_->getOrInsertNamedMetadata("nvvm.annotations")->addOperand(MDNode::get(ctx, md_args));
+  #endif
   }
   // set arguments
   for(unsigned i = 0; i < fn->args().size(); i++)
