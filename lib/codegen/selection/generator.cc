@@ -579,6 +579,7 @@ void generator::visit_load_inst(ir::load_inst* x){
     int tot_width = nbits*vec;
     int width = std::min(tot_width, max_word_width);
     int n_words = std::max(1, tot_width / width);
+#if 0 
     // -----
     // create inline asm string
     // -----
@@ -651,24 +652,21 @@ void generator::visit_load_inst(ir::load_inst* x){
     std::vector<Value*> args = {pred, ptr};
     for(Value *v: others)
         args.push_back(v);
-    std::cout << "generator::visit_load_inst:asm_oss: " << asm_oss.str() << std::endl;
-    std::cout << "generator::visit_load_inst:asm_cstrt: " << asm_cstrt << std::endl;
-    std::cout << "pred: " << pred << std::endl;
-    std::cout << "ptr: " << ptr << std::endl;
-    // std::cout << "args: " << args << std::endl;
-
-    Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/32, 0, /*bool*/true));;
-    Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/32, in_off, /*bool*/false));
-    Value *glc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
-    Value *slc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
+    Value *_ret = call(_asm, args);
+#else
+    std::vector<Type *> ret_tys(n_words, IntegerType::get(*ctx_, width));
+    Type *ret_ty = ret_tys.size() > 1 ? StructType::get(*ctx_, ret_tys) : ret_tys[0];
+    Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, 0, /*bool*/ true));
+    Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, in_off, /*bool*/ false));
+    Value *glc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
+    Value *slc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
     std::vector<Value *>
         arg_vec = {ptr, vindex, offset, glc, slc};
     llvm::Function *fn = llvm::Intrinsic::getDeclaration(mod_, llvm::Intrinsic::amdgcn_buffer_load, {ret_ty});
     Value *_ret = builder_->CreateCall(fn, arg_vec);
     std::cout << "CreateCall" << std::endl;
+#endif
 
-    // Value *_ret = builder_->CreateIntrinsic(llvm::Intrinsic::amdgcn_buffer_load, {ret_ty}, args2);
-    // Value *_ret = call(_asm, args);
     // ---
     // extract and store return values
     // ---
@@ -685,8 +683,6 @@ void generator::visit_load_inst(ir::load_inst* x){
     int tmp = (width / (dtsize * 8));
     for(size_t ii = 0; ii < vec; ii++)
       vals_[x][idxs[i+ii]] = extract_elt(rets[ii/tmp], ii % tmp);
-
-
     print_llvm_ir_tracked(*mod_, "visit_load_inst_for_loop_"+ std::to_string(i)); 
   }
   print_llvm_ir_tracked(*mod_, "visit_load_inst_final");  
