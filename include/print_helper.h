@@ -59,5 +59,12 @@ inline void print_triton_ir(triton::ir::module ir_ref, std::string name)
     ir_out.close();
 }
 
+inline void print_llvm_type(llvm::Type* llvm_type)
+{
+    std::string type_str;
+    llvm::raw_string_ostream rso(type_str);
+    llvm_type->print(rso);
+    std::cout << rso.str() << std::endl;
+}
 
 #endif
