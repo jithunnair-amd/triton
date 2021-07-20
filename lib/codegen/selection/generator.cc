@@ -549,6 +549,7 @@ void generator::visit_load_inst(ir::load_inst* x){
     size_t nts = layouts_->get(x)->to_scanline()->nts(ord[0]);
     vec = std::min(nts, aln);
   }
+  std::cout << "generator::visit_load_inst:vect: " << vec << std::endl;
   // code generation
   auto idxs = idxs_.at(x);
   for(size_t i = 0; i < idxs.size(); i += vec){
@@ -650,7 +651,21 @@ void generator::visit_load_inst(ir::load_inst* x){
     std::vector<Value*> args = {pred, ptr};
     for(Value *v: others)
         args.push_back(v);
-    Value *_ret = call(_asm, args);
+    std::cout << "generator::visit_load_inst:asm_oss: " << asm_oss.str() << std::endl;
+    std::cout << "generator::visit_load_inst:asm_cstrt: " << asm_cstrt << std::endl;
+    std::cout << "pred: " << pred << std::endl;
+    std::cout << "ptr: " << ptr << std::endl;
+    // std::cout << "args: " << args << std::endl;
+
+    Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/32, 0, /*bool*/true));;
+    Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/32, in_off, /*bool*/false));
+    Value *glc_val = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
+    Value *slc_val = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
+    std::vector<Value *>
+        args2 = {ptr, vindex, offset, glc_val, slc_val};
+    Value *_ret = builder_->CreateIntrinsic(llvm::Intrinsic::amdgcn_buffer_load, {ret_ty}, args2);
+    std::cout << "CreateIntrinsic" << std::endl;
+    // Value *_ret = call(_asm, args);
     // ---
     // extract and store return values
     // ---
