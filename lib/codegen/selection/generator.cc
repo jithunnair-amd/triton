@@ -659,12 +659,15 @@ void generator::visit_load_inst(ir::load_inst* x){
 
     Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/32, 0, /*bool*/true));;
     Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/32, in_off, /*bool*/false));
-    Value *glc_val = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
-    Value *slc_val = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
+    Value *glc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
+    Value *slc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/1, 0, /*bool*/true));
     std::vector<Value *>
-        args2 = {ptr, vindex, offset, glc_val, slc_val};
-    Value *_ret = builder_->CreateIntrinsic(llvm::Intrinsic::amdgcn_buffer_load, {ret_ty}, args2);
-    std::cout << "CreateIntrinsic" << std::endl;
+        arg_vec = {ptr, vindex, offset, glc, slc};
+    llvm::Function *fn = llvm::Intrinsic::getDeclaration(mod_, llvm::Intrinsic::amdgcn_buffer_load, {ret_ty});
+    Value *_ret = builder_->CreateCall(fn, arg_vec);
+    std::cout << "CreateCall" << std::endl;
+
+    // Value *_ret = builder_->CreateIntrinsic(llvm::Intrinsic::amdgcn_buffer_load, {ret_ty}, args2);
     // Value *_ret = call(_asm, args);
     // ---
     // extract and store return values
