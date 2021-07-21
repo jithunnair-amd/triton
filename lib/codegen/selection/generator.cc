@@ -12,6 +12,7 @@
 #include "triton/ir/module.h"
 #include "triton/ir/function.h"
 #include "triton/ir/type.h"
+#include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 // #include "llvm/IR/IntrinsicsNVPTX.h"
@@ -20,7 +21,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "print_ir.h"
+#include "print_helper.h"
 
 namespace triton{
 namespace codegen{
@@ -655,13 +656,30 @@ void generator::visit_load_inst(ir::load_inst* x){
     Value *_ret = call(_asm, args);
 #else
     std::vector<Type *> ret_tys(n_words, IntegerType::get(*ctx_, width));
-    Type *ret_ty = ret_tys.size() > 1 ? StructType::get(*ctx_, ret_tys) : ret_tys[0];
+    std::cout << ret_tys.size() << std::endl;
+    // Type *ret_ty = ret_tys.size() > 1 ? StructType::get(*ctx_, ret_tys) : ret_tys[0];
+    std::cout << ptr << std::endl;
+    std::cout << ptr->getName().str() << std::endl;
+    
+    // Value *vindex = llvm::ConstantFP::get(*ctx_, llvm::APFloat(0.0));
+    // Value *offset = llvm::ConstantFP::get(*ctx_, llvm::APFloat(static_cast<float>(in_off)));
+    // Value *glc = llvm::ConstantFP::get(*ctx_, llvm::APFloat(0.0));
+    // Value *slc = llvm::ConstantFP::get(*ctx_, llvm::APFloat(0.0));
+    size_t elementcount = 1;
+    Value *ptr_2 = UndefValue::get(VectorType::get(llvm::Type::getInt32Ty(*ctx_), 4,false));
     Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, 0, /*bool*/ true));
-    Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, in_off, /*bool*/ false));
+    Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, in_off, /*bool*/ true));
     Value *glc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
     Value *slc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
+    Type *ret_ty = llvm::Type::getFloatTy(*ctx_);
+    print_llvm_type(ret_ty);
+    print_llvm_type(ptr_2);
+    print_llvm_type(vindex);
+    print_llvm_type(offset);
+    print_llvm_type(glc);
+    print_llvm_type(slc);
     std::vector<Value *>
-        arg_vec = {ptr, vindex, offset, glc, slc};
+        arg_vec = {ptr_2, vindex, offset, glc, slc};
     llvm::Function *fn = llvm::Intrinsic::getDeclaration(mod_, llvm::Intrinsic::amdgcn_buffer_load, {ret_ty});
     Value *_ret = builder_->CreateCall(fn, arg_vec);
     std::cout << "CreateCall" << std::endl;

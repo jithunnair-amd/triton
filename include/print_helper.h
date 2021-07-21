@@ -67,4 +67,9 @@ inline void print_llvm_type(llvm::Type* llvm_type)
     std::cout << rso.str() << std::endl;
 }
 
+inline void print_llvm_type(llvm::Value* llvm_value)
+{
+    print_llvm_type(llvm_value->getType());
+}
+
 #endif

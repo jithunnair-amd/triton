@@ -21,7 +21,7 @@
 #include "triton/ir/print.h"
 #include "llvm/IR/Module.h"
 #include <fstream>
-#include "print_ir.h"
+#include "print_helper.h"
 
 namespace triton {
 namespace codegen {
