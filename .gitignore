@@ -1,6 +1,10 @@
 __pycache__
 .vscode
-# *_hip*
+core
 python/build
+# *_hip*
 *.so
 *.egg-info/
+*.ir
+*.asm
+*.o
