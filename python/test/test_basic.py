@@ -41,7 +41,7 @@ def copy(x):
 def test_op():
     torch.manual_seed(0)
     size = 7
-    x = torch.arange(size, device='cuda')
+    x = torch.arange(size, dtype=torch.float32, device='cuda')
     za = x
     zb = copy(x)
     print(za)
