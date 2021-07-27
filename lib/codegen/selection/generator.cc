@@ -557,10 +557,13 @@ void generator::visit_load_inst(ir::load_inst* x){
     indices_t idx = idxs[i];
     // pointer value
     Value *ptr = vals_[op][idx];
+    print_llvm_type(ptr);
     // masked load
     size_t dtsize = x->get_type()->get_scalar_ty()->get_primitive_size_in_bits() / 8;
     // input ptr info
     GetElementPtrInst *in_gep = dyn_cast<GetElementPtrInst>(ptr);
+    std::cout << in_gep << std::endl;
+    // print_llvm_type(in_gep);
     size_t in_off;
     if(in_gep){
         ConstantInt* cst = dyn_cast<ConstantInt>(in_gep->idx_begin());
@@ -570,8 +573,11 @@ void generator::visit_load_inst(ir::load_inst* x){
     else{
         in_off = 0;
     }
+    print_llvm_type(ptr);
     Value *pred = mx ? vals_[mx->get_mask_operand()][idx] : builder_->getTrue();
+    print_llvm_type(pred);
     Value *other = mx ? vals_[mx->get_false_value_operand()][idx] : nullptr;
+    // print_llvm_type(other);
     size_t nbits = dtsize*8;
     // pack sub-words (< 32/64bits) into words
     // each load has width min(nbits*vec, 32/64)
@@ -655,31 +661,21 @@ void generator::visit_load_inst(ir::load_inst* x){
         args.push_back(v);
     Value *_ret = call(_asm, args);
 #else
-    std::vector<Type *> ret_tys(n_words, IntegerType::get(*ctx_, width));
-    std::cout << ret_tys.size() << std::endl;
-    // Type *ret_ty = ret_tys.size() > 1 ? StructType::get(*ctx_, ret_tys) : ret_tys[0];
-    std::cout << ptr << std::endl;
-    std::cout << ptr->getName().str() << std::endl;
-    
-    // Value *vindex = llvm::ConstantFP::get(*ctx_, llvm::APFloat(0.0));
-    // Value *offset = llvm::ConstantFP::get(*ctx_, llvm::APFloat(static_cast<float>(in_off)));
-    // Value *glc = llvm::ConstantFP::get(*ctx_, llvm::APFloat(0.0));
-    // Value *slc = llvm::ConstantFP::get(*ctx_, llvm::APFloat(0.0));
-    size_t elementcount = 1;
-    Value *ptr_2 = UndefValue::get(VectorType::get(llvm::Type::getInt32Ty(*ctx_), 4,false));
+    std::cout << "amdgcn_buffer_load gen" << std::endl;
+    Value *load_input_vec = UndefValue::get(VectorType::get(llvm::Type::getInt32Ty(*ctx_), n_words, false)); //TODO use width to set datatype
     Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, 0, /*bool*/ true));
     Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, in_off, /*bool*/ true));
     Value *glc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
     Value *slc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
     Type *ret_ty = llvm::Type::getFloatTy(*ctx_);
     print_llvm_type(ret_ty);
-    print_llvm_type(ptr_2);
+    print_llvm_type(load_input_vec);
     print_llvm_type(vindex);
     print_llvm_type(offset);
     print_llvm_type(glc);
     print_llvm_type(slc);
     std::vector<Value *>
-        arg_vec = {ptr_2, vindex, offset, glc, slc};
+        arg_vec = {load_input_vec, vindex, offset, glc, slc};
     llvm::Function *fn = llvm::Intrinsic::getDeclaration(mod_, llvm::Intrinsic::amdgcn_buffer_load, {ret_ty});
     Value *_ret = builder_->CreateCall(fn, arg_vec);
     std::cout << "CreateCall" << std::endl;
