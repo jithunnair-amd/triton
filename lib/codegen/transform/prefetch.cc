@@ -25,6 +25,7 @@ static void recursive_defs(ir::value *v, ir::basic_block *bb, std::vector<ir::in
 }
 
 void prefetch::run(ir::module &mod) {
+  std::cout << "prefetch::run" << std::endl;
   // 1. collect dot that can be prefethced
   std::vector<ir::dot_inst*> to_prefetch;
   ir::for_each_instruction(mod, [&](ir::instruction *i) {

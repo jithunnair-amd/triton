@@ -511,6 +511,7 @@ void generator::visit_cast_inst(ir::cast_inst* x) {
  * \brief Code Generation for `return`
  */
 void generator::visit_return_inst(ir::return_inst* rr) {
+  std::cout << "generator::visit_return_inst" << std::endl;
   ir::value *ret_val = rr->get_return_value();
   ret(ret_val ? vals_[ret_val][{}] : nullptr);
 }
@@ -806,6 +807,7 @@ void generator::visit_downcast_inst(ir::downcast_inst* x) {
  * \brief Code Generation for `get_program_id`
  */
 void generator::visit_get_program_id_inst(ir::get_program_id_inst* pid) {
+  std::cout << "generator::visit_get_program_id_inst" << std::endl;
   Module *module = builder_->GetInsertBlock()->getModule();
   Value *ret = tgt_->get_block_id(module, *builder_, pid->get_axis());
   vals_[pid][{}] = ret;
@@ -1544,6 +1546,7 @@ void generator::visit_fmadot(ir::dot_inst* C, ir::value* A, ir::value* B, ir::va
  * Dispatches to appropriate specialized function
  */
 void generator::visit_dot_inst(ir::dot_inst* dot) {
+  std::cout << "generator::visit_dot_insts" << std::endl;
   Function *fn = builder_->GetInsertBlock()->getParent();
   Module *module = fn->getParent();
   ir::value *A = dot->get_operand(0);
@@ -2143,6 +2146,7 @@ void generator::visit_function(ir::function* fn) {
 
 
 void generator::visit_layout_mma(analysis::mma_layout* layout) {
+  std::cout << "generator::visit_layout_mma" << std::endl;
   ir::value *a = nullptr;
   ir::value *b = nullptr;
   for(ir::value* v: layout->get_values())
@@ -2333,6 +2337,7 @@ void generator::visit_basic_block(ir::basic_block * block) {
   BasicBlock *parent = bbs_[block];
   builder_->SetInsertPoint(parent);
   for(ir::instruction *i: block->get_inst_list()){
+    std::cout << "generator::visit_basic_block: instruction " << i->repr() << std::endl;
     visit_value(i);
   }
   // Update ir bb -> llvm bb mapping

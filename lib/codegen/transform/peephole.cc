@@ -212,6 +212,7 @@ bool peephole::rewrite_select_masked_load(ir::instruction *value, ir::builder& b
 }
 
 void peephole::run(ir::module &mod) {
+  std::cout << "peephole::run" << std::endl;
   ir::builder &builder = mod.get_builder();
   // keep track of whether any modification was made
   std::set<ir::value*> seen;

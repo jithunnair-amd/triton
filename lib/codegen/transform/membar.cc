@@ -65,6 +65,7 @@ void membar::transfer(ir::basic_block *block,
                       val_set_t& sync_read,
                       std::set<ir::value*>& safe_war,
                       bool& inserted, ir::builder& builder) {
+  std::cout << "membar::transfer" << std::endl;
   ir::basic_block::inst_list_t instructions = block->get_inst_list();
   for(ir::instruction *i: instructions){
     if(dynamic_cast<ir::phi_node*>(i))
