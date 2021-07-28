@@ -12,5 +12,5 @@ export TRITON_LIBHIP=/opt/rocm/lib/libamdhip64.so
 #     -ex 'break add_passes_to_emit_bin' \
 #     --args python python/test/test_add.py
 
-python python/test/test_basic.py
+python python/test/test_empty.py
     # -ex 'ignore 1 472' \

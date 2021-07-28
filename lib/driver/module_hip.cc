@@ -299,7 +299,7 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
   for (llvm::Function &f : module->functions())
     f.addFnAttr(llvm::Attribute::AlwaysInline);
   llvm::legacy::PassManager pass;
-  llvm::raw_svector_ostream pstream(buffer);
+  llvm::raw_svector_ostream stream(buffer);
 
   // create dump files
   std::string module_name = module->getModuleIdentifier();
@@ -324,12 +324,15 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
       new llvm::raw_fd_ostream(isaasm_path, ec, llvm::sys::fs::OF_None));
   std::cout << "isaasm_fs error code: " << ec << std::endl;
 
-  llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
-  pass.add(p);
+  // llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
+  // pass.add(p);
 
   // emit
+  // machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_AssemblyFile);
   // machine->addPassesToEmitFile(pass, *isaasm_fs, nullptr, llvm::CGFT_AssemblyFile);
+  // std::cout << "add asm emit pass" << ec << std::endl;
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CGFT_ObjectFile);
+  std::cout << "add bin emit pass" << ec << std::endl;
   pass.run(*module);
   isabin_fs->flush();
 
@@ -384,6 +387,12 @@ void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* devic
     char _err[errbufsize];
     char _log[logbufsize];
     void* optval[] = {(void*)(uintptr_t)errbufsize, (void*)_err, (void*)(uintptr_t)logbufsize, (void*)_log, (void*)1};
+    
+    // std::ifstream t("_addvisit_value_0.ir");
+    // std::string ptx_custom((std::istreambuf_iterator<char>(t)),
+    //              std::istreambuf_iterator<char>());
+    // ptx_ = ptx_custom;
+
     dispatch::hipModuleLoadDataEx(&*cu_, ptx_.data(), 5, opt, optval);
   }
   catch(exception::cuda::invalid_ptx const &){

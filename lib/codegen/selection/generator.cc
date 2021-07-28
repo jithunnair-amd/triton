@@ -663,6 +663,8 @@ void generator::visit_load_inst(ir::load_inst* x){
 #else
     std::cout << "amdgcn_buffer_load gen" << std::endl;
     Value *load_input_vec = UndefValue::get(VectorType::get(llvm::Type::getInt32Ty(*ctx_), n_words, false)); //TODO use width to set datatype
+    // load_input_vec = insert_elt(load_input_vec, ptr, (uint64_t)0);
+
     Value *vindex = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, 0, /*bool*/ true));
     Value *offset = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 32, in_off, /*bool*/ true));
     Value *glc = llvm::ConstantInt::get(*ctx_, llvm::APInt(/*nbits*/ 1, 0, /*bool*/ true));
