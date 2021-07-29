@@ -40,6 +40,11 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/Program.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -48,6 +53,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "helper.h"
+#include "print_helper.h"
 
 std::string exec(const char* cmd) {
     std::array<char, 128> buffer;
@@ -219,6 +225,10 @@ static std::map<int, int> vptx = {
   {11030, 73},
 };
 
+inline llvm::StringRef AsStringRef(std::string str) {
+  return llvm::StringRef(str.data(), str.size());
+}
+
 std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device* device) {
   std::cout << "hip_module::compile_llvm_module" << std::endl;
 #if 0
@@ -282,7 +292,7 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
   module->setTargetTriple(triple);
   std::string error;
   auto target = llvm::TargetRegistry::lookupTarget(module->getTargetTriple(), error);
-  std::cout <<"lookupTarget error: "<< error << std::endl;
+  std::cout << "lookupTarget error: " << error << std::endl;
   llvm::TargetOptions opt;
   opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
   opt.UnsafeFPMath = false;
@@ -306,11 +316,7 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
   std::error_code ec;
 
   // Dump LLVM IR.
-  std::string ir_path = module_name + std::string(".ir");
-  std::unique_ptr<llvm::raw_fd_ostream> ir_fs(
-      new llvm::raw_fd_ostream(ir_path, ec, llvm::sys::fs::OF_None));
-  module->print(*ir_fs, nullptr);
-  ir_fs->flush();
+  print_llvm_ir(*module, "_before_compile");
 
   // Emit GCN ISA binary.
   std::string isabin_path = module_name + std::string(".o");
@@ -318,11 +324,14 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
       new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::OF_Text));
   std::cout << "isabin_fs error code: " << ec << std::endl;
 
-  // Emit GCN ISA Assembly.
-  std::string isaasm_path = module_name + std::string(".asm");
-  std::unique_ptr<llvm::raw_fd_ostream> isaasm_fs(
-      new llvm::raw_fd_ostream(isaasm_path, ec, llvm::sys::fs::OF_None));
-  std::cout << "isaasm_fs error code: " << ec << std::endl;
+  // // Emit GCN ISA Assembly.
+  // std::string isaasm_path = module_name + std::string(".asm");
+  // std::unique_ptr<llvm::raw_fd_ostream> isaasm_fs(
+  //     new llvm::raw_fd_ostream(isaasm_path, ec, llvm::sys::fs::OF_None));
+  // std::cout << "isaasm_fs error code: " << ec << std::endl;
+
+  // Emit HASCO
+  std::string hsaco_path = module_name + std::string(".hsaco");
 
   // llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
   // pass.add(p);
@@ -332,19 +341,73 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
   // machine->addPassesToEmitFile(pass, *isaasm_fs, nullptr, llvm::CGFT_AssemblyFile);
   // std::cout << "add asm emit pass" << ec << std::endl;
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CGFT_ObjectFile);
-  std::cout << "add bin emit pass" << ec << std::endl;
+  std::cout << "add bin emit pass " << ec << std::endl;
   pass.run(*module);
-  isabin_fs->flush();
 
+  print_llvm_ir(*module, "_compiled_module");
+
+
+  // Locate lld.
+  std::cout << "Locate lld" << std::endl;
+  // TODO(whchung@gmail.com): change to tensorflow::ROCmRoot() after
+  // ROCm-Device-Libs PR.
+  std::string lld_path_1 = "/opt/rocm/llvm/bin";
+  auto lld_program =
+      llvm::sys::findProgramByName("ld.lld", {lld_path_1});
+  if (!lld_program)
+  {
+    std::cout << "lld_program not found" << std::endl;
+  }
+
+  std::cout << "lld_args found: " << isabin_path << hsaco_path << std::endl;
+  std::vector<llvm::StringRef> lld_args{
+      AsStringRef("ld.lld"),
+      AsStringRef("-flavor"),
+      AsStringRef("gnu"),
+      AsStringRef("-shared"),
+      AsStringRef(isabin_path),
+  };
+
+  //  AsStringRef("-o"),
+  //     AsStringRef(hsaco_path),
+
+
+  std::string error_message;
+  std::cout << "lld_result" << std::endl;
+  llvm::ArrayRef args = llvm::ArrayRef<llvm::StringRef>(lld_args.data(), lld_args.size());
+  int lld_result =
+      llvm::sys::ExecuteAndWait(*lld_program, args,
+                                llvm::None, {}, 0, 0, &error_message);
+  
+  if (lld_result)
+  {
+    std::cout << "ld.lld execute fail: " << std::endl;
+    std::cout << error_message << std::endl;
+    std::cout << lld_result << std::endl;
+  }
+
+  // Read HSACO.
+  std::ifstream hsaco_file("a.out", std::ios::binary | std::ios::ate);
+  std::ifstream::pos_type hsaco_file_size = hsaco_file.tellg();
+
+  std::vector<unsigned char> hsaco(hsaco_file_size);
+  hsaco_file.seekg(0, std::ios::beg);
+  hsaco_file.read(reinterpret_cast<char*>(&hsaco[0]), hsaco_file_size);
+  hsaco_file.close();
+
+  std::cout << "hsaco created" << std::endl;
+  return "";
+
+  
+#if 0
   // post-process
   std::string result(buffer.begin(), buffer.end());
-#if 0
   find_and_replace(result, ".version", "\n", ".version " + std::to_string(ptx_major) + "." + std::to_string(ptx_minor) + "\n");
   find_and_replace(result, ".target", "\n", ".target " + sm + "\n");
   while(find_and_replace(result, "\t// begin inline asm", "\n", ""));
   while(find_and_replace(result, "\t// end inline asm", "\n", ""));
-#endif
   return result;
+#endif
 }
 
 void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* device) {
@@ -357,6 +420,7 @@ void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* devic
 
     // Use PTXAS via system call
     if(!ptxas.empty()){
+      std::cout << "hip_module::init_from_ptx: // Use PTXAS via system call" << std::endl;
       // compile ptx with ptxas
       char _fsrc[] = "/tmp/triton_k_XXXXXX";
       char _flog[] = "/tmp/triton_l_XXXXXX";
@@ -398,7 +462,7 @@ void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* devic
   catch(exception::cuda::invalid_ptx const &){
 //#ifdef TRITON_LOG_PTX_ERROR
     // std::cout << ptx << std::endl;
-    std::ofstream out("ptx.hip");
+    std::ofstream out("amdgcn");
     out << ptx;
     out.close();
     std::cerr << "It appears that Triton produced invalid PTX code:" << std::endl;

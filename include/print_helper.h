@@ -23,6 +23,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/Module.h"
 #include <fstream>
+#include "triton/ir/module.h"
 #include "triton/ir/print.h"
 
 static int print_count = 0;

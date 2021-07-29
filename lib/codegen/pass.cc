@@ -30,7 +30,7 @@ namespace codegen {
 // There should be a proper pass manager there!
 void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
                             driver::module *&mod, driver::kernel *&ker, size_t &shared_mem) {
-  print_triton_ir(ir, "_add_before_passes_triton.ir");
+  print_triton_ir(ir, "_before_passes_triton.ir");
   // generate llvm code
   llvm::LLVMContext ctx;
   std::string name = ir.get_function_list()[0]->get_name();
@@ -98,7 +98,7 @@ void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
   prefetch_s.run(ir);
   barriers.run(ir);
   // ir::print(ir, std::cout);
-  print_triton_ir(ir, "_add_before_visit_triton.ir");
+  print_triton_ir(ir, "_before_visit_triton.ir");
   isel.visit(ir, *llvm);
   print_llvm_ir(*llvm, "_after_visit_llvm");
   mod = driver::module::create(dev, std::move(llvm));
