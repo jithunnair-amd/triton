@@ -8,3 +8,4 @@ python/build
 *.ir
 *.asm
 *.o
+*.hsaco

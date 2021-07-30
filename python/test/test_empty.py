@@ -20,6 +20,7 @@ def empty(x):
     # We return a handle to z but, since `torch.cuda.synchronize()` hasn't been called, the kernel is still
     # running asynchronously.
 
+
 def test_op():
     torch.manual_seed(0)
     size = 7
