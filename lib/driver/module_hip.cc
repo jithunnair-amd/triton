@@ -368,7 +368,7 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
       AsStringRef(isabin_path),
       AsStringRef("-o"),
       AsStringRef(hsaco_path),
-  };
+      AsStringRef("\n")};
 
   std::string error_message;
   std::cout << "lld_result" << std::endl;
@@ -385,7 +385,7 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
   }
 
   std::cout << "hsaco created" << std::endl;
-  return "_empty.hsaco";
+  return hsaco_path;
 
   
 #if 0
@@ -441,10 +441,6 @@ void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* devic
     char _log[logbufsize];
     void* optval[] = {(void*)(uintptr_t)errbufsize, (void*)_err, (void*)(uintptr_t)logbufsize, (void*)_log, (void*)1};
     
-    // std::ifstream t("_addvisit_value_0.ir");
-    // std::string ptx_custom((std::istreambuf_iterator<char>(t)),
-    //              std::istreambuf_iterator<char>());
-    // ptx_ = ptx_custom;
 
     // Read HSACO.
     std::ifstream hsaco_file(ptx_, std::ios::binary | std::ios::ate);
