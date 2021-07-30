@@ -70,6 +70,7 @@ host_kernel::host_kernel(driver::module* program, const char *name): kernel(prog
 /* ------------------------ */
 
 cu_kernel::cu_kernel(driver::module *program, const char * name) : kernel(program, hipFunction_t(), true) {
+  std::cout << "cu_kernel::cu_kernel" << std::endl;
   dispatch::hipModuleGetFunction(&*cu_, *program->cu(), name);
   // dispatch::hipFuncSetCacheConfig(*cu_, hipFuncCachePreferShared);
   // properties

@@ -366,11 +366,9 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
       AsStringRef("gnu"),
       AsStringRef("-shared"),
       AsStringRef(isabin_path),
+      AsStringRef("-o"),
+      AsStringRef(hsaco_path),
   };
-
-  //  AsStringRef("-o"),
-  //     AsStringRef(hsaco_path),
-
 
   std::string error_message;
   std::cout << "lld_result" << std::endl;
@@ -386,17 +384,8 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
     std::cout << lld_result << std::endl;
   }
 
-  // Read HSACO.
-  std::ifstream hsaco_file("a.out", std::ios::binary | std::ios::ate);
-  std::ifstream::pos_type hsaco_file_size = hsaco_file.tellg();
-
-  std::vector<unsigned char> hsaco(hsaco_file_size);
-  hsaco_file.seekg(0, std::ios::beg);
-  hsaco_file.read(reinterpret_cast<char*>(&hsaco[0]), hsaco_file_size);
-  hsaco_file.close();
-
   std::cout << "hsaco created" << std::endl;
-  return "";
+  return "_empty.hsaco";
 
   
 #if 0
@@ -457,7 +446,15 @@ void hip_module::init_from_ptx(const std::string& ptx, driver::hip_device* devic
     //              std::istreambuf_iterator<char>());
     // ptx_ = ptx_custom;
 
-    dispatch::hipModuleLoadDataEx(&*cu_, ptx_.data(), 5, opt, optval);
+    // Read HSACO.
+    std::ifstream hsaco_file(ptx_, std::ios::binary | std::ios::ate);
+    std::ifstream::pos_type hsaco_file_size = hsaco_file.tellg();
+
+    std::vector<unsigned char> hsaco(hsaco_file_size);
+    hsaco_file.seekg(0, std::ios::beg);
+    hsaco_file.read(reinterpret_cast<char*>(&hsaco[0]), hsaco_file_size);
+    hsaco_file.close();
+    dispatch::hipModuleLoadDataEx(&*cu_, hsaco.data(), 5, opt, optval);
   }
   catch(exception::cuda::invalid_ptx const &){
 //#ifdef TRITON_LOG_PTX_ERROR

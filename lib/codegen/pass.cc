@@ -102,6 +102,7 @@ void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
   isel.visit(ir, *llvm);
   print_llvm_ir(*llvm, "_after_visit_llvm");
   mod = driver::module::create(dev, std::move(llvm));
+  std::cout << name << std::endl;
   ker = driver::kernel::create(&*mod, name.c_str());
   shared_mem = allocation.allocated_size();
 }
