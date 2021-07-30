@@ -570,7 +570,10 @@ class Kernel:
         # enqueue cached function into stream
         binary = cache[key]
         cu_stream = torch.cuda.current_stream(device.index).cuda_stream
-        stream = _triton.driver.cu_stream(cu_stream, False)
+        if torch.version.hip is not None:
+            stream = _triton.driver.hip_stream(cu_stream, False)
+        else:
+            stream = _triton.driver.cu_stream(cu_stream, False)
         grid = grid(meta) if hasattr(grid, '__call__') else grid
         binary(stream, params, *grid)
         return binary
