@@ -30,10 +30,12 @@ void prefetch::run(ir::module &mod) {
   std::vector<ir::dot_inst*> to_prefetch;
   ir::for_each_instruction(mod, [&](ir::instruction *i) {
     if (auto *dot = dynamic_cast<ir::dot_inst*>(i)) {
+#ifndef __HIP_PLATFORM_AMD__
       // Now only do prefetching when dot is fp16 & volta/turing
       if (dot->get_operand(0)->get_type()->get_scalar_ty()->get_type_id() != ir::type::HalfTyID ||
           tgt_->as_nvidia()->sm() >= 80)
         return;
+#endif
       auto *a = dynamic_cast<ir::phi_node*>(dot->get_operand(0));
       auto *b = dynamic_cast<ir::phi_node*>(dot->get_operand(1));
       if (a && a->get_incoming_block(1) == a->get_parent() &&
@@ -69,6 +71,7 @@ void prefetch::run(ir::module &mod) {
     builder.create_prefetch_s(b->get_incoming_value(1), /*inc*/ 1);
   }
 
+#ifndef __HIP_PLATFORM_AMD__
   // move loads to the beginning of the loop
   if (tgt_->as_nvidia()->sm() < 80) {
     for (ir::function *fn : mod.get_function_list())
@@ -108,5 +111,6 @@ void prefetch::run(ir::module &mod) {
       }
     }
   }
+#endif
 }
 } // namespace triton::codegen::transform

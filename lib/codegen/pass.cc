@@ -38,7 +38,11 @@ void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
   print_llvm_ir(*llvm, "_before_passes_llvm");
   // optimizations
   std::unique_ptr<codegen::target> target = dev->make_target();
+#ifdef __HIP_PLATFORM_AMD__
+  bool cts_use_async = false;
+#else
   bool cts_use_async = target->as_nvidia()->sm() >= 80;
+#endif
   // create passes
   codegen::analysis::align align;
   codegen::analysis::axes axes;

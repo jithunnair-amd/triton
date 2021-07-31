@@ -100,6 +100,7 @@ void membar::transfer(ir::basic_block *block,
     bool is_i_double_buffered = i->get_type()->is_block_ty() &&
                                 layouts_->get(i)->to_shared() &&
                                 layouts_->get(i)->to_shared()->get_double_buffer();
+  #ifndef __HIP_PLATFORM_AMD__
     // WAR barrier is not required when data is double-buffered
     // TODO: how about other patterns, like WWAR?
     if(!intersect_with(read, sync_write).empty() || 
@@ -110,6 +111,7 @@ void membar::transfer(ir::basic_block *block,
       barrier = (ir::barrier_inst*)builder.create_barrier();
       inserted = true;
     }
+  #endif
     // update state of asynchronous copies
     if(async_wait){
       int N = async_write.size() - async_wait->get_N();

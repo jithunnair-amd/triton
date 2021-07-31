@@ -1559,10 +1559,12 @@ void generator::visit_dot_inst(ir::dot_inst* dot) {
   unsigned NK = A_shapes[red_axis];
   bool is_outer = NK == 1;
   bool is_mma = layouts_->get(dot)->to_mma();
+#ifndef __HIP_PLATFORM_AMD__
   if(!is_outer && is_mma && tgt_->as_nvidia()->sm() < 80)
     return visit_mma884(dot, A, B, D, NK);
   if(!is_outer && is_mma && tgt_->as_nvidia()->sm() >= 80)
     return visit_mma16816(dot, A, B, D, NK);
+#endif
   return visit_fmadot(dot, A, B, D, NK, c_ty, f_mul_add);
 }
 
@@ -2165,7 +2167,12 @@ void generator::visit_layout_mma(analysis::mma_layout* layout) {
   Value *_8 = i32(8);
   Value *_16 = i32(16);
   Value *_32 = i32(32);
+#ifdef __HIP_PLATFORM_AMD__
+  int cc = 1; // generate ir for older CUDA cards
+#else
   int cc = tgt_->as_nvidia()->sm();
+#endif
+
   std::vector<Value*> idx_m;
   std::vector<Value*> idx_n;
   std::vector<Value*> idx_z;
