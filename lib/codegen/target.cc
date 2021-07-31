@@ -21,7 +21,7 @@ nvidia_cu_target* target::as_nvidia() {
 }
 
 bool target::is_gpu() const {
-  return true;
+  return is_gpu_;
 }
 
 // AMD
