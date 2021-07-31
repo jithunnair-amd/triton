@@ -12,16 +12,19 @@
 #include "triton/ir/module.h"
 #include "triton/ir/function.h"
 #include "triton/ir/type.h"
-#include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
-// #include "llvm/IR/IntrinsicsNVPTX.h"
+#ifdef __HIP_PLATFORM_AMD__
+#include "llvm/IR/Type.h"
+#include "print_helper.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#else
+#include "llvm/IR/IntrinsicsNVPTX.h"
+#endif
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "print_helper.h"
 
 namespace triton{
 namespace codegen{
@@ -587,7 +590,7 @@ void generator::visit_load_inst(ir::load_inst* x){
     int tot_width = nbits*vec;
     int width = std::min(tot_width, max_word_width);
     int n_words = std::max(1, tot_width / width);
-#if 0 
+#ifndef __HIP_PLATFORM_AMD__
     // -----
     // create inline asm string
     // -----
@@ -2112,7 +2115,7 @@ void generator::visit_function(ir::function* fn) {
   // set metadata
   if(tgt_->is_gpu()){
       tgt_->set_kernel(*builder_, ctx, mod_, ret);
-  #if 0
+  #ifndef __HIP_PLATFORM_AMD__
       Metadata *md_args[] = {
         ValueAsMetadata::get(ret),
         MDString::get(ctx, "maxntidx"),
