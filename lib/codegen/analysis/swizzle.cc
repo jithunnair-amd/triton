@@ -10,7 +10,6 @@ namespace analysis{
 
 
 void swizzle::run(ir::module &) {
-    std::cout << "swizzle::run" << std::endl;
     per_phase_.clear();
     max_phase_.clear();
 

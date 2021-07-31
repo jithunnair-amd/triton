@@ -25,7 +25,6 @@ static void recursive_defs(ir::value *v, ir::basic_block *bb, std::vector<ir::in
 }
 
 void prefetch::run(ir::module &mod) {
-  std::cout << "prefetch::run" << std::endl;
   // 1. collect dot that can be prefethced
   std::vector<ir::dot_inst*> to_prefetch;
   ir::for_each_instruction(mod, [&](ir::instruction *i) {
@@ -71,9 +70,14 @@ void prefetch::run(ir::module &mod) {
     builder.create_prefetch_s(b->get_incoming_value(1), /*inc*/ 1);
   }
 
-#ifndef __HIP_PLATFORM_AMD__
+
+#ifdef __HIP_PLATFORM_AMD__
+  if (false)
+  {
+#else
   // move loads to the beginning of the loop
   if (tgt_->as_nvidia()->sm() < 80) {
+#endif
     for (ir::function *fn : mod.get_function_list())
     for (ir::basic_block *bb : fn->blocks()) {
       // only apply to loop body
@@ -111,6 +115,5 @@ void prefetch::run(ir::module &mod) {
       }
     }
   }
-#endif
 }
 } // namespace triton::codegen::transform

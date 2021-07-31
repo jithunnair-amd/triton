@@ -138,7 +138,6 @@ mma_layout::mma_layout(size_t num_warps,
                        const std::vector<ir::value *> &values,
                        analysis::align* align, target* tgt,
                        shared_layout *layout_a, shared_layout *layout_b): data_layout(MMA, axes, shape, values, align) {
-  std::cout << "mma_layout::mma_layout" << std::endl;
   /* fragments per warp */
   // try to make things as square as possible to maximize data re-use
 #ifdef __HIP_PLATFORM_AMD__

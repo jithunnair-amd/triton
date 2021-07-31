@@ -13,15 +13,21 @@
 #include "triton/codegen/transform/peephole.h"
 #include "triton/codegen/transform/pipeline.h"
 #include "triton/codegen/transform/prefetch.h"
+#ifdef __HIP_PLATFORM_AMD__
 #include "triton/driver/device_hip.h"
 #include "triton/driver/kernel_hip.h"
 #include "triton/driver/module_hip.h"
+#include <fstream>
+#include "print_helper.h"
+#else
+#include "triton/driver/device.h"
+#include "triton/driver/kernel.h"
+#include "triton/driver/module.h"
+#endif
 #include "triton/ir/function.h"
 #include "triton/ir/module.h"
 #include "triton/ir/print.h"
 #include "llvm/IR/Module.h"
-#include <fstream>
-#include "print_helper.h"
 
 namespace triton {
 namespace codegen {
@@ -30,12 +36,10 @@ namespace codegen {
 // There should be a proper pass manager there!
 void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
                             driver::module *&mod, driver::kernel *&ker, size_t &shared_mem) {
-  print_triton_ir(ir, "_before_passes_triton.ir");
   // generate llvm code
   llvm::LLVMContext ctx;
   std::string name = ir.get_function_list()[0]->get_name();
   std::unique_ptr<llvm::Module> llvm(new llvm::Module(name, ctx));
-  print_llvm_ir(*llvm, "_before_passes_llvm");
   // optimizations
   std::unique_ptr<codegen::target> target = dev->make_target();
 #ifdef __HIP_PLATFORM_AMD__
@@ -102,11 +106,8 @@ void add_passes_to_emit_bin(ir::module &ir, driver::device *dev, int num_warps,
   prefetch_s.run(ir);
   barriers.run(ir);
   // ir::print(ir, std::cout);
-  print_triton_ir(ir, "_before_visit_triton.ir");
   isel.visit(ir, *llvm);
-  print_llvm_ir(*llvm, "_after_visit_llvm");
   mod = driver::module::create(dev, std::move(llvm));
-  std::cout << name << std::endl;
   ker = driver::kernel::create(&*mod, name.c_str());
   shared_mem = allocation.allocated_size();
 }
