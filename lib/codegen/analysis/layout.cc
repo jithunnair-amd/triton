@@ -144,7 +144,7 @@ mma_layout::mma_layout(size_t num_warps,
       if (false)
       {
 #else
-      if (tgt_->as_nvidia()->sm() < 80)
+      if (tgt->as_nvidia()->sm() < 80)
       {
 #endif
     fpw_ = {2, 2, 1};
