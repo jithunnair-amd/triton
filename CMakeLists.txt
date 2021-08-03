@@ -3,14 +3,6 @@ include(ExternalProject)
 
 set(USE_ROCM TRUE)
 
-# Trigger hipify if it is ROCm build
-# if (USE_ROCM)
-# include(third_party/hipify-torch/cmake/Hipify.cmake)
-# endif()
-
-# set(CMAKE_VERBOSE_MAKEFILE ON)
-
-
 if(NOT TRITON_LLVM_BUILD_DIR)
     set(TRITON_LLVM_BUILD_DIR ${CMAKE_BINARY_DIR})
 endif()
@@ -18,7 +10,12 @@ endif()
 
 project(triton)
 include(CTest)
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+if (USE_ROCM)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" "${PROJECT_SOURCE_DIR}/third_party/hipify-torch/cmake")
+    # include(Hipify)
+else()
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+endif()
 
 # Options
 option(BUILD_TUTORIALS "Build C++ Triton tutorials" ON)
