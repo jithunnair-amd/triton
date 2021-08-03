@@ -9,6 +9,7 @@ rm -rf python/triton/__pycache__/
 rm -rf python/triton/ops/__pycache__/
 rm -rf python/triton/ops/blocksparse/__pycache__/
 rm -rf *.asm
+rm -rf *.gcn
 rm -rf *.ir
 rm -rf *.o
 rm -rf amdgcn

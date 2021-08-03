@@ -7,5 +7,6 @@ python/build
 *.egg-info/
 *.ir
 *.asm
+*.gcn
 *.o
 *.hsaco
