@@ -318,65 +318,35 @@ std::string hip_module::compile_llvm_module(llvm::Module* module, driver::device
   // Dump LLVM IR.
   print_llvm_ir(*module, "_before_compile");
 
-  // Emit GCN ISA binary.
+  // Save GCN ISA binary.
   std::string isabin_path = module_name + std::string(".o");
   std::unique_ptr<llvm::raw_fd_ostream> isabin_fs(
       new llvm::raw_fd_ostream(isabin_path, ec, llvm::sys::fs::OF_Text));
   std::cout << "isabin_fs error code: " << ec << std::endl;
 
-  // // Emit GCN ISA Assembly.
-  // std::string isaasm_path = module_name + std::string(".asm");
-  // std::unique_ptr<llvm::raw_fd_ostream> isaasm_fs(
-  //     new llvm::raw_fd_ostream(isaasm_path, ec, llvm::sys::fs::OF_None));
-  // std::cout << "isaasm_fs error code: " << ec << std::endl;
-
-  // Emit HASCO
-  std::string hsaco_path = module_name + std::string(".hsaco");
-
   // llvm::TargetLibraryInfoWrapperPass* p = new llvm::TargetLibraryInfoWrapperPass(llvm::Triple(module->getTargetTriple()));
   // pass.add(p);
 
   // emit
-  // machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_AssemblyFile);
-  // machine->addPassesToEmitFile(pass, *isaasm_fs, nullptr, llvm::CGFT_AssemblyFile);
-  // std::cout << "add asm emit pass" << ec << std::endl;
+  machine->addPassesToEmitFile(pass, stream, nullptr, llvm::CodeGenFileType::CGFT_AssemblyFile);
   machine->addPassesToEmitFile(pass, *isabin_fs, nullptr, llvm::CGFT_ObjectFile);
-  std::cout << "add bin emit pass " << ec << std::endl;
   pass.run(*module);
+
+  // Save GCN ISA.
+  std::string amdgcn_path = module_name + std::string(".gcn");
+  std::string result(buffer.begin(), buffer.end());
+  std::ofstream amdgcn(amdgcn_path);
+  amdgcn << result;
+  amdgcn.close();
 
   print_llvm_ir(*module, "_compiled_module");
 
-
-  // Locate lld.
-  std::cout << "Locate lld" << std::endl;
-  // TODO(whchung@gmail.com): change to tensorflow::ROCmRoot() after
-  // ROCm-Device-Libs PR.
-  std::string lld_path_1 = "/opt/rocm/llvm/bin";
-  auto lld_program =
-      llvm::sys::findProgramByName("ld.lld", {lld_path_1});
-  if (!lld_program)
-  {
-    std::cout << "lld_program not found" << std::endl;
-  }
-
-  std::cout << "lld_args found: " << isabin_path << hsaco_path << std::endl;
-  std::vector<llvm::StringRef> lld_args{
-      AsStringRef("ld.lld"),
-      AsStringRef("-flavor"),
-      AsStringRef("gnu"),
-      AsStringRef("-shared"),
-      AsStringRef(isabin_path),
-      AsStringRef("-o"),
-      AsStringRef(hsaco_path),
-      AsStringRef("\n")};
-
+  // generate HASCO file
+  std::string hsaco_path = module_name + std::string(".hsaco");
   std::string error_message;
-  std::cout << "lld_result" << std::endl;
-  llvm::ArrayRef args = llvm::ArrayRef<llvm::StringRef>(lld_args.data(), lld_args.size());
   int lld_result =
-      llvm::sys::ExecuteAndWait(*lld_program, args,
+      llvm::sys::ExecuteAndWait("/opt/rocm/llvm/bin/ld.lld", {"/opt/rocm/llvm/bin/ld.lld", "-flavor", "gnu", "-shared", "-o", hsaco_path, isabin_path},
                                 llvm::None, {}, 0, 0, &error_message);
-  
   if (lld_result)
   {
     std::cout << "ld.lld execute fail: " << std::endl;
